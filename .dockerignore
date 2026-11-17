@@ -1,0 +1,13 @@
+# The image needs cpp/ only (docker/Dockerfile copies nothing else).
+.git
+*.zip
+*.log
+results/
+logs/
+records/
+cpp/build/
+cpp/bin/
+__pycache__/
+.pytest_cache/
+*.swp
+*~

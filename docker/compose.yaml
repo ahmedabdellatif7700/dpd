@@ -1,0 +1,31 @@
+# The dpd stage on the Jetson: the service that takes the place of the Pi's pass-through dpd_bb
+# (on-chip-training docs/testbed/rpi/PIPELINE.md, DPD place A). It keeps the service's name, so
+# its timing log is dpd_bb.csv. As in the user's Jetson CUDA template: runtime nvidia, the
+# models mounted read-only. Unlike it: restart "no" (PIPELINE.md 3.5, a stage never restarts on
+# its own: it could not resume its stream).
+#
+#   make -C docker build      make -C docker check      (make -C docker help)
+#
+# Step 3 fills in the stage: its command, AROF_IN/AROF_OUT/AROF_TAP towards the Pi, the ports and
+# the network. The endpoint values below are placeholders until then.
+name: arof-dpd
+
+services:
+  dpd_bb:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: arof-dpd:local
+    runtime: nvidia
+    restart: "no"
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      AROF_STAGE: dpd_bb
+      AROF_IN: tcp://0.0.0.0:7002       # placeholder: where source sends (step 3)
+      AROF_OUT: tcp://co_optics:7003    # placeholder: co_optics on the Pi (step 3)
+      AROF_LOG_DIR: /logs
+      AROF_CONNECT_TIMEOUT_S: "60"
+    volumes:
+      - ../results/models:/models:ro    # the weights trained by the Python reference
+      - ../logs:/logs
