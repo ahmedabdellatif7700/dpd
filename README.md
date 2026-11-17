@@ -1,121 +1,121 @@
-# dpd: the DPD stage of the A-RoF testbed, on the Jetson Orin Nano
+# dpd — digital predistortion stage for the A-RoF testbed
 
-The digital predistorter (DPD) of the 60 GHz A-RoF link (16QAM, 0.4 GBd, 15 km SSMF, a GaN PA at
-the remote antenna unit), at the central office: it predistorts the baseband drive of the IQ
-modulator, so that the chain up to the PA's output becomes linear; no equalizer at the receiver.
-The end result is **one stage of the link pipeline**, the `dpd` stage, in place of the Pi's
-pass-through `dpd_bb` service (DPD place A), with the same stage contract as the other ten stages;
-only its image (the Jetson, CUDA) and its host differ.
+Digital predistortion (DPD) for the 60 GHz analog radio-over-fiber link of `on-chip-training`:
+16QAM at 0.4 GBd, 15 km SSMF, a GaN power amplifier (PA) at the remote antenna unit, no equalizer
+at the receiver. The DPD sits at the central office and predistorts the baseband drive of the IQ
+modulator so that the chain up to the PA's output is linear.
 
-This repository will be merged into `on-chip-training` (branch `dpd`): the Python DPD into
-`matlab/dpd/py/`, the stage into `testbed/jetson/`. It uses no paths into that repository; what is
-copied from it says where from. The paper's plan is `matlab/dpd/README.md` there.
+On the testbed the DPD is **one stage of the link pipeline**: the `dpd` stage, running on a Jetson
+Orin Nano's GPU in place of the Raspberry Pi's pass-through `dpd_bb` service (DPD place A). It
+follows the same stage contract as the Pi's ten other stages, which stay on the Pi.
 
-| Part | What | Where |
-|---|---|---|
-| Reference DPD | PyTorch: the models, ILA training, a test PA (port of `rf_amp.m`); numpy at the boundary, so MATLAB calls it through `bridge.py` on the PC (CPU) | `dpd/`, `tests/`, `scripts/` |
-| Hardware DPD | C++ with hand-written CUDA kernels, the weights trained by the reference; frame v2 and the stage contract from a copy of the Pi's stage library | `cpp/` (steps 2-3) |
-| Container | the stage's image: CUDA 13.2 build and runtime, NVIDIA runtime, compose service `dpd_bb` | `docker/` |
-| Docs | the Jetson, the env, the image, how to run | [docs/testbed/jetson/README.md](docs/testbed/jetson/README.md) |
+## Overview
 
-Development runs in the conda env `machine-learning` (Miniconda, [environment.yml](environment.yml));
-the stage runs in Docker. Long jobs in a detached tmux session.
+| Part | Role | Runs in | Where |
+|---|---|---|---|
+| Reference DPD | defines the model, trains it by indirect learning (ILA), produces the expected outputs; called from MATLAB on the PC | conda env `machine-learning` (PyTorch, CPU or GPU) | `dpd/`, `tests/`, `scripts/` |
+| C++/CUDA twin | the same model, inference only, hand-written CUDA kernels, the reference's weights | Docker, NVIDIA runtime | `cpp/` |
+| The `dpd` stage | the twin inside the pipeline: frame v2, the stage contract, the PA tap | Docker, NVIDIA runtime | `cpp/`, `docker/` |
+
+The twin is checked against the reference: same input, same output within float32 tolerance.
+
+Documentation: **[docs/](docs/README.md)** — how to run ([howto/](docs/howto/README.md)), the
+reference ([dpd/](docs/dpd/README.md)) and every equation it computes
+([METHODOLOGY](docs/dpd/METHODOLOGY.md)), the Jetson and the image ([testbed/jetson/](docs/testbed/jetson/README.md)).
+
+## Layout
+
+```
+dpd/                the reference DPD (Python package)
+tests/              its unit tests (pytest)
+scripts/            checks that produce results/ (step1_check.py)
+results/            step reports, trained weights (results/models/*.pt, 84 kB each)
+cpp/                the C++/CUDA twin and the stage (CMake)
+docker/             the stage's image and compose service
+docs/               documentation
+environment.yml     the conda env
+```
+
+This repository is to be merged into `on-chip-training`: `dpd/` into `matlab/dpd/py/`, the stage
+into `testbed/jetson/`. It holds no paths into that repository; what was copied from it is listed
+under [Provenance](#provenance).
+
+## Quick start (Jetson)
+
+```bash
+conda activate machine-learning
+python -m pytest -q                                  # unit tests, ~80 s
+python scripts/step1_check.py --device cuda          # ILA on the test PA, ~6 min (run in tmux)
+make -C docker check                                 # build the image, GPU self-test in the container
+```
+
+Details: [docs/howto/jetson.md](docs/howto/jetson.md).
 
 ## Steps
 
 | # | Step | Output | Status |
 |---|---|---|---|
-| 1 | Reference transformer DPD in PyTorch, ILA, a test PA; NMSE/EVM with and without the DPD | `dpd/`, `tests/`, `scripts/step1_check.py`, `results/step1.txt` | done |
-| 2 | The transformer in C++/CUDA (hand-written kernels) on the Jetson's GPU, float32: against the PyTorch reference, throughput at the BASEBAND frame size | `cpp/` | |
-| 3 | The `dpd` stage container: frame v2, the stage contract (a copy of the Pi's stage library), `bypass` and `dpd` modes, the PA tap; tested with a Python feeder and sink; the hookup to the Pi proposed (not done) | `cpp/`, `docker/`, `tests/` | the image's base done |
+| 1 | Reference transformer DPD in PyTorch; ILA on a test PA; NMSE and EVM with and without the DPD | `dpd/`, `tests/`, `scripts/step1_check.py`, `results/step1.txt` | done |
+| — | Container base: the stage's image (CUDA 13.2, sm_87) and the C++ build | `docker/`, `cpp/` | done |
+| 2 | The transformer as hand-written CUDA kernels on the Jetson's GPU (float32): checked against the reference; throughput at the BASEBAND frame size | `cpp/` | next (branch `cuda-kernels`) |
+| 3 | The `dpd` stage: frame v2 and the stage contract (a copy of the Pi's stage library), `bypass` and `dpd` modes, the PA tap; tested with a Python feeder and sink; the hookup to the Pi proposed | `cpp/`, `docker/`, `tests/` | |
 
-Open, to bring to the user: **κ**, the drive scale. `co_optics` computes it from the calibration
-block it receives, which with a DPD in front is the predistorted one; the MATLAB DPD acts on `κ·s`
-with κ from the undistorted signal. A proposal comes with step 3.
+## Open decisions
 
-## Record of the steps
+- **Drive scale κ.** `co_optics` computes κ from the calibration block it receives; with a DPD in
+  front, that block is predistorted, whereas the MATLAB DPD acts on `κ·s` with κ from the
+  undistorted signal. A proposal for how `dpd_bb` and `co_optics` agree on κ comes with step 3.
+- **The DPD's rate.** The reference model runs at 8 samples per symbol (3.2 GS/s, the rate of the
+  DPD plan); the pipeline's BASEBAND is at 50 (20 GS/s). Either the stage resamples around the
+  model, or the model is trained at 50. To settle before step 3.
+- **The PA with memory.** ILA stops at -16 dB NMSE when the PA's memory option is on (off in the
+  nominal link); left to the model screens.
 
-### Step 1 (2026-11-17): the reference transformer DPD
+## Record
 
-**Environment.** Miniconda in `~/miniconda3`, env `machine-learning`: Python 3.12.16, PyTorch
-2.11.0+cu130 (NVIDIA's JetPack 7 wheel, Jetson AI Lab index `sbsa/cu130`), numpy 2.5.5, scipy
-1.18.1; `torch.cuda.is_available()` true on the Orin (CC 8.7; the wheel's sm_80 code runs there).
+### Step 1 — reference transformer DPD (2026-11-17)
 
-**Model** (`dpd/models.py`, `TransformerDPD`). A window of 32 complex drive samples as I/Q pairs
-(output sample n sees n-16 .. n+15, zeros beyond the sequence's ends, no delay); a linear embedding
-to width 32 plus a learned position embedding; a transformer encoder of 2 pre-norm layers, 4 heads,
-feed-forward 64, GELU; a layer norm and a linear head on the centre token, added to the centre
-sample (a skip; the head starts at zero, so an untrained model is the identity). Inputs are divided
-by a stored scale (the RMS of the first training input), so the model works in volts or in a0.
+A transformer DPD (window of 32 complex samples, 2 pre-norm encoder layers, width 32, 4 heads;
+**18 338 parameters, 657 k MAC per sample**), trained by ILA on a Python port of the link's PA
+(`rf_amp.m`, the nominal 3GPP GaN PA, driven with data plus pilot tone at the link's levels).
+Training on the GPU: 3 ILA passes, **~170 s**. Test sequence (seed 2017), `results/step1.txt`:
 
-- **18 338 parameters**; **657 k multiply-accumulates per output sample** (1.31 MFLOP; the whole
-  window is encoded for every sample: Q/K/V and output projections, scores, feed-forward; softmax,
-  GELU and norms not counted).
-- `DPD` wraps it for numpy: `predistort(x)` (complex in, complex out, any length, CPU or CUDA,
-  float32 inside), `predistort_reim(re, im)` (MATLAB's two float64 vectors), `fit(u, t)`,
-  `save`/`load`.
+| PA | NMSE, dB | EVM, waveform, % | EVM, symbols, % |
+|---|---|---|---|
+| nominal | -14.86 → **-48.45** | 17.56 → **0.22** | 17.29 → **0.20** |
+| nominal, memory on | -10.64 → -16.19 | 28.61 → 9.89 | 27.36 → 7.96 |
 
-**ILA** (`dpd/ila.py`). A post-inverse g, warm-started from the current DPD, is trained so that
-g(y/G) ≈ x_d (x_d the drive that went through the link, y the PA's output with the tone removed,
-G the complex LS gain of y on x without DPD), then copied in front as the DPD; the first pass starts
-from no DPD. `ila_step` takes one recording (the form of the Pi's data: BASEBAND and the lossless PA
-tap); `ila` runs passes against a callable link.
+- Without DPD the test chain's EVM, 17.6 %, agrees with the MATLAB link's PA alone (17.3 %): a
+  check of the port and of the signal levels.
+- The nominal PA is linearized to the training floor, far inside the 3GPP 16QAM limit of 12.5 %.
+  The DPD raises the PA input's peak-to-average ratio from 3.3 to 5.4 dB.
+- With the PA's memory on, the post-inverse fits to -41 dB but the predistorter reaches only -16 dB:
+  the known limit of ILA once nonlinearity and memory mix. Open (see above).
+- A first run showed a floor of -35 dB that came from the measure, not the DPD: removing the pilot
+  tone as the output's mean also removes the data's own mean. The measures now fit a constant, as
+  the link's EVM definition does.
 
-**Test PA** (`dpd/pa.py`, a fixture, not a link stage). `rf_amp.m` ported line for line (AGC, Rapp
-AM/AM, Saleh AM/PM, the memory polynomial; MATLAB's `round` and `eps` kept), with the nominal link's
-3GPP GaN PA: asat 1.5 a0, smoothness 1.94, AM/PM α 0.51, β 1.93; memory (0.6 ns, linear
-[-0.08 0.03], cubic [-0.05 0.02]) off as in the nominal link, on in a second case. The test chain
-drives it with the data plus the pilot tone at the levels the link gives the PA (tone 1.104 a0, data
-RMS 0.371 a0, from `matlab/results/pa_operating_point.txt`) and removes the tone as the output's
-mean. Checked (`tests/test_pa.py`) against values computed by hand from the .m file's formulas:
+Model, ILA, test PA and measures: [docs/dpd/](docs/dpd/README.md). Environment: Python 3.12, PyTorch
+2.11.0+cu130 (NVIDIA's JetPack 7 wheel), CUDA available on the Orin. 19 unit tests pass.
 
-| Input | Expected (by hand) |
-|---|---|
-| \|A\| = asat = 1.5, AM/AM only | 1.5 / 2^(1/3.88) = 1.2546026733935693 |
-| A = 1, P_RX 2 dB below the reference (AGC) | A_in = 1.5848931924611134, out 1.287725872296698 |
-| 0.6·e^{j0.3}, AM/AM and AM/PM | \|out\| 0.5956588580691601, phase +0.062347188264058676 rad |
-| memory at 3.2 GS/s (D = round(1.92) = 2), u = [0.5 0 0 0 0.8j] | y[2] = -0.04625, y[4] = 0.0175 + 0.8j |
-| delay of 2.5 samples | D = 3 (MATLAB's round; numpy's would give 2) |
+### Container base (2026-11-17)
 
-**The check** (`scripts/step1_check.py`, GPU). 16QAM RRC (roll-off 0.75, span 16) at 8 samples per
-symbol (3.2 GS/s, the DPD rate of `matlab/dpd/README.md`); training sequence 4096 symbols (seed 1),
-validation and test 2048 (seeds 4242 and 2017); ILA 3 passes × 30 epochs, batch 512, Adam 2e-3 with
-a cosine schedule. Measures (`dpd/metrics.py`), against the undistorted drive, each with a fitted
-complex gain and constant (the tone is removed as a constant): NMSE over the whole band; the EVM of
-the waveform in-band as `main_pa_operating_point.m` defines it; the EVM of the matched-filtered
-symbols (the receiver up to its decisions). Test sequence (`results/step1.txt`):
+The stage's image, `arof-dpd:local`: built on `nvidia/cuda:13.2.0-devel` (CMake, Ninja, sm_87),
+run on `nvidia/cuda:13.2.0-runtime`, with the NVIDIA runtime; compose service `dpd_bb`. Its
+self-test, `gpu_check`, finds the Orin (CC 8.7, 8 SMs, CUDA runtime and driver 13.2) from inside
+the container and runs a kernel on one BASEBAND frame (6400 samples) with error 0. Design and
+the templates it follows: [docs/testbed/jetson/](docs/testbed/jetson/README.md).
 
-| PA | Training (GPU) | NMSE, dB | EVM waveform, % | EVM symbols, % |
-|---|---|---|---|---|
-| nominal (Rapp + AM/PM) | 169 s | -14.86 → **-48.45** | 17.56 → **0.22** | 17.29 → **0.20** |
-| nominal + memory | 167 s | -10.64 → -16.19 | 28.61 → 9.89 | 27.36 → 7.96 |
+## Provenance
 
-The validation sequence gives the same to 0.1. Without DPD the test chain's EVM (17.6 %) matches
-the MATLAB link's PA alone at 1.5 a0 (17.3 %, `pa_operating_point.txt`), a check of the port and the
-levels. The DPD raises the PA input's peak-to-average ratio from 3.3 to 5.4 dB (the expansion the
-compression needs).
+Copied or ported from `on-chip-training`, branch `dpd`:
 
-- **Nominal PA**: linearized to the float32 and training floor (post-inverse NMSE -56.6, -57.3,
-  -58.1 dB over the passes), far inside the 3GPP 12.5 % EVM.
-- **With memory**: the DPD halves the error but stops at -16 dB, although the post-inverse fits to
-  -41 dB: the classic ILA gap with memory (a post-inverse is not a pre-inverse once nonlinearity and
-  memory mix; the cubic memory term on data plus tone also makes an image, x*, term). Memory is off
-  in the nominal link (an impairment-study option); this case is left open for the model screens.
-- A first run showed a floor of -35 dB NMSE and 1.7 % symbol EVM that was the measure's, not the
-  DPD's: the tone's removal as the mean takes the data's own small mean with it. The measures now fit
-  a constant, as `main_pa_operating_point.m`'s EVM does.
-
-Tests: `python -m pytest -q`, 18 passed (78 s): the PA port, the model (identity at start, dtypes and
-the bridge's form, the window alignment and span, save/load, size, CPU against CUDA on a 6400-sample
-frame), a short ILA run that must improve NMSE by 6 dB and the EVM by 40 %.
-
-### The container's base (2026-11-17, ahead of steps 2-3)
-
-`docker/` and `cpp/`, after the user's two templates (a Jetson CUDA Docker project and a C++ CMake
-project; details and departures in [docs/testbed/jetson/README.md](docs/testbed/jetson/README.md)):
-`nvidia/cuda:13.2.0` devel to build (CMake + Ninja, sm_87, ccache), runtime to run, the compat
-workaround, `runtime: nvidia`, the compose service `dpd_bb` with `restart: "no"`, a Makefile with
-Jetson and SSH targets. `make -C docker check` builds the image (`arof-dpd:local`, 5.8 GB) and runs
-its self-test `gpu_check` in it: CUDA runtime and driver 13.2, the Orin (CC 8.7, 8 SMs) found, a
-native sm_87 kernel on one BASEBAND frame (6400 complex samples) with error 0. The stage itself
-comes in step 3, the kernels of the transformer in step 2.
+| Here | From | What |
+|---|---|---|
+| `dpd/pa.py` | `matlab/link/rf_amp.m` | the PA model, ported line for line |
+| `dpd/pa.py` | `matlab/link/default_link_odsb.m`, `matlab/core/impairment_sweeps_odsb.m` (`joint_nominal`) | the PA's parameters; the nominal case (saturation 1.5 a0, AM/PM on) |
+| `dpd/pa.py` | `matlab/results/pa_operating_point.txt` | the PA input's levels: pilot tone 1.104 a0, data 0.371 a0 RMS |
+| `dpd/signals.py` | `matlab/link/default_tx.m`, `transmit_receive_odsb.m` | 16QAM, RRC roll-off 0.75, span 16; `rcosdesign` and `upfirdn` ported |
+| `dpd/metrics.py` | `matlab/paper_rewrite/validation/main_pa_operating_point.m` | the EVM of the PA's output (gain and constant fitted, in-band) |
+| `dpd/models.py`, `dpd/ila.py` | `matlab/dpd/README.md` | the DPD plan: the transformer's shape, ILA, the DPD rate, the seeds |
+| `docker/`, `cpp/` | `docs/testbed/rpi/PIPELINE.md` | the stage contract, the service name `dpd_bb`, `restart: "no"` |
