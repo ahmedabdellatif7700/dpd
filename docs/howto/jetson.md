@@ -28,6 +28,14 @@ make -C docker build                    # the image arof-dpd:local (compiles cpp
 make -C docker check                    # build, then the GPU self-test in the container
 make -C docker shell                    # a shell in the image, GPU attached
 make -C cpp run                         # the same C++/CUDA build on the host (nvcc 13.2, no Docker)
+make -C cpp test                        # the C++ model against the reference's golden files (ctest)
+```
+
+In the image, against the golden files (the models are mounted at `/models`):
+
+```bash
+docker compose -f docker/compose.yaml run --rm dpd_bb \
+    golden_check /models/transformer_nominal.dpdt /models/golden/transformer_nominal.dpdt
 ```
 
 `make -C docker check` should print the CUDA runtime and driver 13.2, the device `Orin` (8.7) and

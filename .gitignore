@@ -7,3 +7,4 @@ results/models/*.onnx
 results/models/*.engine
 logs/
 *.zip
+.vscode/

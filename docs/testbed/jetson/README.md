@@ -71,7 +71,7 @@ host's driver, and NVIDIA Container Toolkit 1.19.1's CDI `enable-cuda-compat` ho
 timing log is `dpd_bb.csv` — with `runtime: nvidia` and `restart: "no"` (the stage contract: a
 stage never restarts, since it could not resume its stream). The trained weights,
 `results/models/`, are mounted read-only at `/models`. Until step 3 the service runs `gpu_check`
-(`cpp/src/gpu_check.cu`), the image's self-test: it reports the CUDA runtime, the driver and the
+(`cpp/tools/gpu_check.cu`), the image's self-test: it reports the CUDA runtime, the driver and the
 device, runs a kernel on one BASEBAND frame (6400 complex samples) and checks it against the CPU.
 
 ```text

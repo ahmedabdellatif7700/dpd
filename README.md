@@ -21,7 +21,7 @@ The twin is checked against the reference: same input, same output within float3
 
 Documentation: **[docs/](docs/README.md)** — how to run ([howto/](docs/howto/README.md)), the
 reference ([dpd/](docs/dpd/README.md)) and every equation it computes
-([METHODOLOGY](docs/dpd/METHODOLOGY.md)), the Jetson and the image ([testbed/jetson/](docs/testbed/jetson/README.md)).
+([METHODOLOGY](docs/dpd/METHODOLOGY.md)), the Jetson and the image ([testbed/jetson/](docs/testbed/jetson/README.md)), the twin ([twin/](docs/twin/README.md)).
 
 ## Layout
 
@@ -47,6 +47,7 @@ under [Provenance](#provenance).
 conda activate machine-learning
 python -m pytest -q                                  # unit tests, ~80 s
 python scripts/step1_check.py --device cuda          # ILA on the test PA, ~6 min (run in tmux)
+make -C cpp test                                     # the C++ model against the reference (golden files)
 make -C docker check                                 # build the image, GPU self-test in the container
 ```
 
@@ -58,7 +59,7 @@ Details: [docs/howto/jetson.md](docs/howto/jetson.md).
 |---|---|---|---|
 | 1 | Reference transformer DPD in PyTorch; ILA on a test PA; NMSE and EVM with and without the DPD | `dpd/`, `tests/`, `scripts/step1_check.py`, `results/step1.txt` | done |
 | — | Container base: the stage's image (CUDA 13.2, sm_87) and the C++ build | `docker/`, `cpp/` | done |
-| 2 | The transformer as hand-written CUDA kernels on the Jetson's GPU (float32): checked against the reference; throughput at the BASEBAND frame size | `dpd/export.py`, `cpp/` | in progress (branch `cuda-kernels`): part 1 of 5 done |
+| 2 | The transformer as hand-written CUDA kernels on the Jetson's GPU (float32): checked against the reference; throughput at the BASEBAND frame size | `dpd/export.py`, `cpp/` | in progress (branch `cuda-kernels`): parts 1-2 of 5 done |
 | 3 | The `dpd` stage: frame v2 and the stage contract (a copy of the Pi's stage library), `bypass` and `dpd` modes, the PA tap; tested with a Python feeder and sink; the hookup to the Pi proposed | `cpp/`, `docker/`, `tests/` | |
 
 ## Open decisions
@@ -121,8 +122,16 @@ its output, and the intermediate values (after the embedding, each layer, the fi
 probed samples at the frame's ends and middle. The weights load back into the reference with
 outputs identical bit for bit. 24 unit tests pass.
 
-Plan of the rest of step 2: (2) the model in plain C++ on the CPU, against the golden files;
-(3) the CUDA kernels, one fused kernel per frame first, then optimized; (4) the check against the
+### Step 2, part 2 — the model in plain C++ (2026-11-17)
+
+`cpp/`: the DPDT reader, the weights (every shape checked), and the forward pass in plain C++,
+float32, transcribed from [METHODOLOGY](docs/dpd/METHODOLOGY.md): the twin's own reference for the
+CUDA kernels. Against the golden files of both models (`make -C cpp test`, ctest; the same in the
+image): output error 1.0e-6 and 9.2e-7, every probed intermediate within 1.4e-6 (relative to the
+RMS; float32 rounding, which does not grow through the layers). 1 200 samples/s on one CPU core.
+Details: [docs/twin/](docs/twin/README.md).
+
+Plan of the rest of step 2: (3) the CUDA kernels, one fused kernel per frame first, then optimized; (4) the check against the
 reference, and the PA-output NMSE and EVM with the twin; (5) the throughput and latency per frame.
 
 ## Provenance

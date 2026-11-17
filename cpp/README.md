@@ -1,9 +1,11 @@
 # cpp
 
-The C++/CUDA twin of the reference DPD: the transformer as hand-written CUDA kernels (inference
-only, the reference's weights) and the `dpd` stage around it. Today: the build and the image's GPU
-self-test (`src/gpu_check.cu`). `make`, `make run`, `make debug`, `make clean` on the host;
+The C++/CUDA twin of the reference DPD (inference only, the reference's weights) and, in step 3,
+the `dpd` stage around it. Today: the DPDT reader, the weights, the model in plain C++ on the CPU
+(`src/`, `include/dpd/`), its check against the reference's golden files and the image's GPU
+self-test (`tools/`). `make`, `make test`, `make run`, `make debug`, `make clean` on the host;
 `make -C ../docker check` in the image.
 
-Docs: [docs/testbed/jetson/](../docs/testbed/jetson/README.md), what it must compute:
-[docs/dpd/METHODOLOGY.md](../docs/dpd/METHODOLOGY.md), how to run: [docs/howto/jetson.md](../docs/howto/jetson.md).
+Docs: [docs/twin/](../docs/twin/README.md), what it computes:
+[docs/dpd/METHODOLOGY.md](../docs/dpd/METHODOLOGY.md), the files it reads:
+[docs/dpd/FORMAT.md](../docs/dpd/FORMAT.md), how to run: [docs/howto/jetson.md](../docs/howto/jetson.md).
