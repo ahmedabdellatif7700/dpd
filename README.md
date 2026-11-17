@@ -29,7 +29,8 @@ reference ([dpd/](docs/dpd/README.md)) and every equation it computes
 dpd/                the reference DPD (Python package)
 tests/              its unit tests (pytest)
 scripts/            checks that produce results/ (step1_check.py)
-results/            step reports, trained weights (results/models/*.pt, 84 kB each)
+results/            step reports; trained models (results/models/: *.pt for PyTorch, *.dpdt for the
+                    twin, golden/*.dpdt to check it)
 cpp/                the C++/CUDA twin and the stage (CMake)
 docker/             the stage's image and compose service
 docs/               documentation
@@ -57,7 +58,7 @@ Details: [docs/howto/jetson.md](docs/howto/jetson.md).
 |---|---|---|---|
 | 1 | Reference transformer DPD in PyTorch; ILA on a test PA; NMSE and EVM with and without the DPD | `dpd/`, `tests/`, `scripts/step1_check.py`, `results/step1.txt` | done |
 | — | Container base: the stage's image (CUDA 13.2, sm_87) and the C++ build | `docker/`, `cpp/` | done |
-| 2 | The transformer as hand-written CUDA kernels on the Jetson's GPU (float32): checked against the reference; throughput at the BASEBAND frame size | `cpp/` | next (branch `cuda-kernels`) |
+| 2 | The transformer as hand-written CUDA kernels on the Jetson's GPU (float32): checked against the reference; throughput at the BASEBAND frame size | `dpd/export.py`, `cpp/` | in progress (branch `cuda-kernels`): part 1 of 5 done |
 | 3 | The `dpd` stage: frame v2 and the stage contract (a copy of the Pi's stage library), `bypass` and `dpd` modes, the PA tap; tested with a Python feeder and sink; the hookup to the Pi proposed | `cpp/`, `docker/`, `tests/` | |
 
 ## Open decisions
@@ -68,6 +69,11 @@ Details: [docs/howto/jetson.md](docs/howto/jetson.md).
 - **The DPD's rate.** The reference model runs at 8 samples per symbol (3.2 GS/s, the rate of the
   DPD plan); the pipeline's BASEBAND is at 50 (20 GS/s). Either the stage resamples around the
   model, or the model is trained at 50. To settle before step 3.
+- **Frame boundaries.** The model's window reaches 16 samples back and 15 ahead. The reference and
+  the golden file take a frame alone (zeros beyond its ends); in the pipeline, consecutive
+  BASEBAND frames are one continuous drive, so the stage must keep the previous frame's last 16
+  samples and wait for the next frame's first 15 (a 15-sample delay, one frame of look-ahead).
+  How that fits the one-frame-in, one-frame-out rule comes with step 3.
 - **The PA with memory.** ILA stops at -16 dB NMSE when the PA's memory option is on (off in the
   nominal link); left to the model screens.
 
@@ -105,6 +111,19 @@ run on `nvidia/cuda:13.2.0-runtime`, with the NVIDIA runtime; compose service `d
 self-test, `gpu_check`, finds the Orin (CC 8.7, 8 SMs, CUDA runtime and driver 13.2) from inside
 the container and runs a kernel on one BASEBAND frame (6400 samples) with error 0. Design and
 the templates it follows: [docs/testbed/jetson/](docs/testbed/jetson/README.md).
+
+### Step 2, part 1 — export for the twin (2026-11-17)
+
+The reference writes what the C++/CUDA twin reads, in one plain format of named float32 tensors
+([FORMAT](docs/dpd/FORMAT.md)): the weights (`results/models/*.dpdt`, 74.5 kB, 33 tensors) and a
+golden file per model (`results/models/golden/*.dpdt`, 202 kB): a 6400-sample BASEBAND-sized frame,
+its output, and the intermediate values (after the embedding, each layer, the final norm) of 8
+probed samples at the frame's ends and middle. The weights load back into the reference with
+outputs identical bit for bit. 24 unit tests pass.
+
+Plan of the rest of step 2: (2) the model in plain C++ on the CPU, against the golden files;
+(3) the CUDA kernels, one fused kernel per frame first, then optimized; (4) the check against the
+reference, and the PA-output NMSE and EVM with the twin; (5) the throughput and latency per frame.
 
 ## Provenance
 

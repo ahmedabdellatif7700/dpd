@@ -49,10 +49,22 @@ class TransformerDPD(nn.Module):
         # input scale (the RMS of the training input), so that the model works in any units
         self.register_buffer("scale", torch.tensor(1.0))
 
-    def forward(self, w):
+    def forward(self, w, trace=None):
+        """w [B, window, 2] -> [B, 2]. trace: a dict that, if given, receives the intermediate
+        values (embed, layer0, layer1, ..., final_norm, out), the golden files' probes"""
         z = w / self.scale
-        h = self.encoder(self.embed(z) + self.pos)
-        out = z[:, self.centre] + self.head(self.norm(h[:, self.centre]))
+        h = self.embed(z) + self.pos
+        if trace is not None:
+            trace["embed"] = h
+        for i, layer in enumerate(self.encoder.layers):   # = self.encoder(h): no final norm
+            h = layer(h)
+            if trace is not None:
+                trace[f"layer{i}"] = h
+        n = self.norm(h[:, self.centre])
+        out = z[:, self.centre] + self.head(n)
+        if trace is not None:
+            trace["final_norm"] = n
+            trace["out"] = out
         return out * self.scale
 
     def ops_per_sample(self):

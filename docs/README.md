@@ -28,7 +28,7 @@ that points here.
 
 | Piece | Docs |
 |---|---|
-| The reference DPD (PyTorch) | [dpd/](dpd/README.md), [METHODOLOGY](dpd/METHODOLOGY.md) (every equation and constant, the page the twin implements) |
+| The reference DPD (PyTorch) | [dpd/](dpd/README.md), [METHODOLOGY](dpd/METHODOLOGY.md) (every equation and constant, the page the twin implements), [FORMAT](dpd/FORMAT.md) (the weights and golden files the twin reads) |
 | The Jetson, its env and the stage's image | [testbed/jetson/](testbed/jetson/README.md) |
 | The plan and the record of the steps | [../README.md](../README.md) |
 
@@ -44,6 +44,7 @@ The pipeline the stage plugs into is documented in on-chip-training: `docs/testb
 | [METHODOLOGY](dpd/METHODOLOGY.md) in numpy | the PyTorch model | equal to 1e-5 (`tests/test_methodology.py`) |
 | reference on CUDA | the reference on the CPU, one 6400-sample frame | equal to 1e-4 (`tests/test_models.py`) |
 | reference DPD by ILA | no DPD, nominal PA, test sequence | NMSE -14.9 → -48.5 dB, EVM 17.3 → 0.20 % (step 1) |
+| exported weights (`.dpdt`) | the trained model | identical outputs, bit for bit (`scripts/export_model.py`, `tests/test_export.py`) |
 | the image | the CPU | a kernel on one 6400-sample frame, error 0 (`gpu_check`) |
 | C++/CUDA twin | the reference | step 2 |
 | the `dpd` stage | the stage contract, the reference offline | step 3 |

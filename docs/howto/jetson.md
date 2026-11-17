@@ -12,6 +12,8 @@ python -m pytest -q                     # the unit tests, ~80 s (CPU, and CUDA w
 tmux new -s step1 'python scripts/step1_check.py --device cuda'
                                         # ILA on the test PA, ~6 min on the GPU:
                                         # results/step1.txt, step1.json, results/models/*.pt
+python scripts/export_model.py          # the weights and golden files for the twin:
+                                        # results/models/*.dpdt, results/models/golden/*.dpdt
 ```
 
 `step1_check.py` takes `--device cpu|cuda`, `--passes`, `--epochs`, `--n-train`, `--n-eval`. A new
