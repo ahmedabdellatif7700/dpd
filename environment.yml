@@ -1,0 +1,19 @@
+# conda env `machine-learning` on the Jetson Orin Nano (JetPack 7, L4T R39.2.1, CUDA 13.2), as created
+# for steps 1-2 (docs/testbed/jetson/README.md). PyTorch is NVIDIA's JetPack 7 wheel (Jetson AI Lab
+# index sbsa/cu130, CUDA 13.0 runtime from pip); its Python (3.12) sets the env's.
+#   conda env create -f environment.yml
+# On the PC (CPU only, MATLAB's bridge) the same packages with the CPU torch of pypi suffice.
+name: machine-learning
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12.16
+  - numpy=2.5.5
+  - scipy=1.18.1
+  - matplotlib=3.11.2
+  - pytest=9.2.0
+  - pip=26.2.2
+  - pip:
+      - --index-url https://pypi.jetson-ai-lab.io/sbsa/cu130/+simple
+      - --extra-index-url https://pypi.org/simple
+      - torch==2.11.0

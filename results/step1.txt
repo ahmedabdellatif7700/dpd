@@ -1,0 +1,12 @@
+Step 1: transformer DPD by ILA on the test PA (dpd/pa.py), cuda (Orin), torch 2.11.0+cu130
+Model: window 32, width 32, 4 heads, 2 layers, FF 64: 18338 parameters, 657.5 k MAC = 1314.9 k FLOP per sample
+Drive: 16QAM RRC (0.75) at 8 sps (3.2 GS/s), data RMS 0.371 a0 + tone 1.104 a0; train 32889 samples (seed 1), test 16505 (seed 2017); ILA 3 passes x 30 epochs, batch 512, Adam 2e-3 cosine
+
+case              train s             NMSE dB      EVM waveform %       EVM symbols %
+                                no DPD -> DPD       no DPD -> DPD       no DPD -> DPD
+nominal             169.2    -14.86 -> -48.45     17.56 ->   0.22     17.29 ->   0.20
+nominal_memory      167.0    -10.64 -> -16.19     28.61 ->   9.89     27.36 ->   7.96
+
+validation (seed 4242), same columns:
+nominal                      -14.84 -> -48.83     17.57 ->   0.21     17.28 ->   0.20
+nominal_memory               -10.61 -> -16.12     28.71 ->   9.86     27.39 ->   7.87

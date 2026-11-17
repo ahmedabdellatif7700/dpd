@@ -1,0 +1,116 @@
+{
+ "env": {
+  "python": "3.12.16",
+  "torch": "2.11.0+cu130",
+  "numpy": "2.5.5",
+  "device": "cuda",
+  "gpu": "Orin",
+  "threads": 6
+ },
+ "setup": {
+  "sps": 8,
+  "fs": 3200000000.0,
+  "tone_a0": 1.104,
+  "data_rms_a0": 0.371,
+  "n_train_samples": 32889,
+  "n_eval_samples": 16505,
+  "passes": 3,
+  "epochs": 30,
+  "batch": 512,
+  "lr": 0.002
+ },
+ "cases": {
+  "nominal": {
+   "G": [
+    0.7889028391570688,
+    0.15958263751173232
+   ],
+   "train_time_s": 169.1928070129943,
+   "pass_post_inverse_nmse_db": [
+    -56.60323184270073,
+    -57.30424083674329,
+    -58.12228432645974
+   ],
+   "validation": {
+    "no_dpd": {
+     "nmse_db": -14.843008143972764,
+     "evm_waveform_pct": 17.57245825204789,
+     "evm_symbols_pct": 17.277464736869362,
+     "papr_in_db": 3.202176122463076
+    },
+    "dpd": {
+     "nmse_db": -48.83490269741344,
+     "evm_waveform_pct": 0.2128722046982159,
+     "evm_symbols_pct": 0.19775063169733142,
+     "papr_in_db": 5.387824835358566
+    }
+   },
+   "test": {
+    "no_dpd": {
+     "nmse_db": -14.859742582376276,
+     "evm_waveform_pct": 17.560326853309636,
+     "evm_symbols_pct": 17.294462653655856,
+     "papr_in_db": 3.282347959480947
+    },
+    "dpd": {
+     "nmse_db": -48.45005147882863,
+     "evm_waveform_pct": 0.2221036682152557,
+     "evm_symbols_pct": 0.20495935394184567,
+     "papr_in_db": 5.387446731481413
+    }
+   }
+  },
+  "nominal_memory": {
+   "G": [
+    0.6508891806999301,
+    0.15862554777835497
+   ],
+   "train_time_s": 167.0300626870012,
+   "pass_post_inverse_nmse_db": [
+    -41.272258354532084,
+    -35.263352012451634,
+    -37.334306253153386
+   ],
+   "validation": {
+    "no_dpd": {
+     "nmse_db": -10.605699847692252,
+     "evm_waveform_pct": 28.707202818999413,
+     "evm_symbols_pct": 27.385858879147555,
+     "papr_in_db": 3.202176122463076
+    },
+    "dpd": {
+     "nmse_db": -16.11729786060622,
+     "evm_waveform_pct": 9.860407165351678,
+     "evm_symbols_pct": 7.865095059671662,
+     "papr_in_db": 4.633415573661641
+    }
+   },
+   "test": {
+    "no_dpd": {
+     "nmse_db": -10.643697373500574,
+     "evm_waveform_pct": 28.612012705215662,
+     "evm_symbols_pct": 27.35599627481567,
+     "papr_in_db": 3.282347959480947
+    },
+    "dpd": {
+     "nmse_db": -16.192682221501972,
+     "evm_waveform_pct": 9.885286777986806,
+     "evm_symbols_pct": 7.955289536811887,
+     "papr_in_db": 4.695038840576952
+    }
+   }
+  }
+ },
+ "model": {
+  "kind": "transformer",
+  "window": 32,
+  "d_model": 32,
+  "n_heads": 4,
+  "n_layers": 2,
+  "d_ff": 64,
+  "params": 18338,
+  "macs": 657472,
+  "flops": 1314944,
+  "device": "cuda"
+ }
+}
