@@ -60,7 +60,7 @@ sm_87 builds, but for CUDA 12 and L4T R36.
 
 | Stage | Base | Content |
 |---|---|---|
-| build | `nvidia/cuda:13.2.0-devel-ubuntu24.04` | CMake + Ninja + ccache; `cpp/` compiled for sm_87 (native code, no JIT at start-up) |
+| build | `nvidia/cuda:13.2.0-devel-ubuntu24.04` | CMake + Ninja + ccache + nlohmann/json (the stage library's); `cpp/` compiled for sm_87 (native code, no JIT at start-up) |
 | run | `nvidia/cuda:13.2.0-runtime-ubuntu24.04` | the binaries only, in `/opt/arof-dpd` (image 5.8 GB, against 10.4 GB for the devel base) |
 
 CUDA 13.2 matches the host's driver; a newer CUDA in the image would need the forward-compatibility

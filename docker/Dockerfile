@@ -25,13 +25,14 @@ RUN for dir in \
         fi; \
     done
 
-# Install build dependencies.
+# Install build dependencies (nlohmann/json: the stage library's, as on the Pi).
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         cmake \
         ninja-build \
         build-essential \
-        ccache && \
+        ccache \
+        nlohmann-json3-dev && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src

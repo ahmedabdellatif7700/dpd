@@ -21,13 +21,14 @@ The weights files are named after the test PA they were trained on, not after a 
 | `include/dpd/resampler.h`, `cpu_resampler.h`, `gpu_resampler.h`; `src/cpu_resampler.cpp`, `src/gpu_resampler.cu` | the resampler 50 ↔ 8 (`ResamplerFilter`, `load_resampler`; `CpuResampler` and `GpuResampler`, one interface) |
 | `include/dpd/device_buffer.h`, `src/device_buffer.cu`, `src/cuda_util.h` | GPU memory owned by a `unique_ptr` (`DeviceBuffer`); `check` and `device_alloc` for the CUDA sources |
 | `tools/resampler_check.cpp` | the resampler, CPU and GPU, against its golden file, and its time per frame |
+| `arof/` | the Pi's stage library, copied verbatim (frame v2, `StageRunner`, `run_filter`, the tap, the timing log) with its test; source commit and checksums in `arof/README.md` |
 | `tools/model_check.h` | the check both tools share: a model against a golden file |
 | `tools/golden_check.cpp` | `CpuModel` against a golden file, and its speed on one core |
 | `tools/cuda_check.cpp` | `GpuModel` against a golden file and against `CpuModel`, and the kernel's speed |
 | `tools/dpd_bench.cpp` | the latency and throughput per frame on the GPU, as the stage will run it (`scripts/step2_timing.sh`) |
 | `tools/dpd_apply.cpp` | predistorts a drive file on the GPU or the CPU: the bridge to the Python checks |
 | `tools/gpu_check.cu` | the image's GPU self-test |
-| `CMakeLists.txt`, `Makefile` | the libraries `dpd_core` (CPU) and `dpd_gpu` (CUDA), the tools, the ctest checks |
+| `CMakeLists.txt`, `Makefile` | the libraries `arof_pipe` (the stage library), `dpd_core` (CPU) and `dpd_gpu` (CUDA), the tools, the ctest checks |
 
 ## The two models
 

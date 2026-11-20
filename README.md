@@ -60,7 +60,7 @@ Details: [docs/howto/jetson.md](docs/howto/jetson.md).
 | 1 | Reference transformer DPD in PyTorch; ILA on a test PA; NMSE and EVM with and without the DPD | `dpd/`, `tests/`, `scripts/step1_check.py`, `results/step1.txt` | done |
 | — | Container base: the stage's image (CUDA 13.2, sm_87) and the C++ build | `docker/`, `cpp/` | done |
 | 2 | The transformer as hand-written CUDA kernels on the Jetson's GPU (float32): checked against the reference; throughput at the BASEBAND frame size | `dpd/export.py`, `cpp/` | done (branch `cuda-kernels`, to merge after review) |
-| 3 | The `dpd` stage: frame v2 and the stage contract (a copy of the Pi's stage library), `bypass` and `dpd` modes, the PA tap; tested with a Python feeder and sink; the hookup to the Pi proposed | `dpd/resample.py`, `dpd/stream.py`, `cpp/`, `docker/`, `tests/` | in progress (branch `dpd-stage`): the resampler done |
+| 3 | The `dpd` stage: frame v2 and the stage contract (a copy of the Pi's stage library), `bypass` and `dpd` modes, the PA tap; tested with a Python feeder and sink; the hookup to the Pi proposed | `dpd/resample.py`, `dpd/stream.py`, `cpp/`, `docker/`, `tests/` | in progress (branch `dpd-stage`): the resampler and the stage library done |
 
 ## Decisions for the stage (2026-11-20)
 
@@ -189,6 +189,15 @@ gives the whole drive's transform to 1e-6. The twin's `CpuResampler` and `GpuRes
 reference within 8.8e-7 and take 0.065 ms per frame on the GPU. 36 unit tests and 5 ctest checks
 pass. `results/step3_resampler.txt`; [STAGE.md](docs/testbed/jetson/STAGE.md).
 
+### Step 3, part 2 — the stage library (2026-11-20)
+
+`cpp/arof/`: the Pi's stage library copied verbatim from on-chip-training `14a72ff`
+(`testbed/rpi/src/stage/`, the version 1 frame header it builds on, and its test), with the source
+and the checksum of every file in `cpp/arof/README.md`; `diff` against the source shows no
+difference. Built as the Pi builds it (nlohmann/json from the system or a pinned download; apt in
+the image); it compiles clean here as C++20 with `-Wpedantic`, and its own test passes on the Jetson
+and in the image. The `dpd` stage is built on it next.
+
 ## Provenance
 
 Copied or ported from `on-chip-training`, branch `dpd`:
@@ -202,3 +211,5 @@ Copied or ported from `on-chip-training`, branch `dpd`:
 | `dpd/metrics.py` | `matlab/paper_rewrite/validation/main_pa_operating_point.m` | the EVM of the PA's output (gain and constant fitted, in-band) |
 | `dpd/models.py`, `dpd/ila.py` | `matlab/dpd/README.md` | the DPD plan: the transformer's shape, ILA, the DPD rate, the seeds |
 | `docker/`, `cpp/` | `docs/testbed/rpi/PIPELINE.md` | the stage contract, the service name `dpd_bb`, `restart: "no"` |
+| `cpp/arof/` | `testbed/rpi/src/stage/`, `src/stream/frame.h`, `tests/test_stage.cpp`, `tests/check.h` (commit `14a72ff`) | the stage library, verbatim |
+| `cpp/CMakeLists.txt` (nlohmann/json) | `testbed/rpi/CMakeLists.txt` | the dependency lookup and the pinned download |
