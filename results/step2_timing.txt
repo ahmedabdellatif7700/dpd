@@ -1,0 +1,38 @@
+Step 2, part 5: dpd_bench, 2026-11-20T19:16Z, power mode: 25W
+
+dpd_bench: frame 6400 samples, 1000 frames, pinned host memory, back to back
+dpd_bench: latency (copy in, kernel, copy out) ms: median 16.799, p99 17.129, max 17.444
+dpd_bench: kernel alone ms: median 16.674, p99 16.819, max 17.333
+dpd_bench: copies and waiting, median 0.125 ms
+dpd_bench: throughput while busy 379732 samples/s; over the run 379727 samples/s
+
+dpd_bench: frame 6400 samples, 1000 frames, pageable host memory, back to back
+dpd_bench: latency (copy in, kernel, copy out) ms: median 16.788, p99 17.046, max 20.299
+dpd_bench: kernel alone ms: median 16.672, p99 16.702, max 16.728
+dpd_bench: copies and waiting, median 0.116 ms
+dpd_bench: throughput while busy 380146 samples/s; over the run 380140 samples/s
+
+dpd_bench: frame 6400 samples, 1000 frames, pinned host memory, paced every 25.600000 ms
+dpd_bench: latency (copy in, kernel, copy out) ms: median 17.257, p99 17.523, max 17.582
+dpd_bench: kernel alone ms: median 17.134, p99 17.200, max 17.208
+dpd_bench: copies and waiting, median 0.124 ms
+dpd_bench: throughput while busy 370025 samples/s; over the run 250081 samples/s
+
+dpd_bench: frame 1024 samples, 1000 frames, pinned host memory, back to back
+dpd_bench: latency (copy in, kernel, copy out) ms: median 2.776, p99 2.998, max 3.210
+dpd_bench: kernel alone ms: median 2.714, p99 2.741, max 2.774
+dpd_bench: copies and waiting, median 0.062 ms
+dpd_bench: throughput while busy 366453 samples/s; over the run 366427 samples/s
+
+dpd_bench: frame 1024 samples, 1000 frames, pageable host memory, back to back
+dpd_bench: latency (copy in, kernel, copy out) ms: median 2.777, p99 3.019, max 3.082
+dpd_bench: kernel alone ms: median 2.714, p99 2.745, max 2.774
+dpd_bench: copies and waiting, median 0.063 ms
+dpd_bench: throughput while busy 365905 samples/s; over the run 365877 samples/s
+
+dpd_bench: frame 1024 samples, 1000 frames, pinned host memory, paced every 25.600000 ms
+dpd_bench: latency (copy in, kernel, copy out) ms: median 8.879, p99 9.130, max 9.241
+dpd_bench: kernel alone ms: median 8.053, p99 8.073, max 8.085
+dpd_bench: copies and waiting, median 0.826 ms
+dpd_bench: throughput while busy 115375 samples/s; over the run 40026 samples/s
+

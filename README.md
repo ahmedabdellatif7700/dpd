@@ -59,7 +59,7 @@ Details: [docs/howto/jetson.md](docs/howto/jetson.md).
 |---|---|---|---|
 | 1 | Reference transformer DPD in PyTorch; ILA on a test PA; NMSE and EVM with and without the DPD | `dpd/`, `tests/`, `scripts/step1_check.py`, `results/step1.txt` | done |
 | — | Container base: the stage's image (CUDA 13.2, sm_87) and the C++ build | `docker/`, `cpp/` | done |
-| 2 | The transformer as hand-written CUDA kernels on the Jetson's GPU (float32): checked against the reference; throughput at the BASEBAND frame size | `dpd/export.py`, `cpp/` | in progress (branch `cuda-kernels`): parts 1-4 of 5 done |
+| 2 | The transformer as hand-written CUDA kernels on the Jetson's GPU (float32): checked against the reference; throughput at the BASEBAND frame size | `dpd/export.py`, `cpp/` | done (branch `cuda-kernels`, to merge after review) |
 | 3 | The `dpd` stage: frame v2 and the stage contract (a copy of the Pi's stage library), `bypass` and `dpd` modes, the PA tap; tested with a Python feeder and sink; the hookup to the Pi proposed | `cpp/`, `docker/`, `tests/` | |
 
 ## Open decisions
@@ -160,8 +160,18 @@ nominal PA -48.446 dB and 0.205 % on the test sequence, as the reference. The st
 measures moved into `dpd/evaluate.py`, shared by both checks (step 1's numbers unchanged). 27 unit
 tests pass, among them the twin on a short drive. Details: [docs/twin/](docs/twin/README.md).
 
-Plan of the rest of step 2: (4, done) the check against the
-reference, and the PA-output NMSE and EVM with the twin; (5) the throughput and latency per frame.
+### Step 2, part 5 — latency and throughput per frame (2026-11-20)
+
+`cpp/tools/dpd_bench` times each frame as the stage will run it: copy in, kernel, copy out
+(`scripts/step2_timing.sh`, `results/step2_timing.txt`). Paced at the pipeline's rate (a 128-symbol
+frame every 25.6 ms), the latency is **17.3 ms median, 17.6 ms at most at 50 samples per symbol**
+(6400-sample frames, the GPU busy 67 %), and **8.9 ms median at 8** (1024-sample frames): both keep
+up. The copies cost 0.06 to 0.13 ms (shared memory). At 8 samples per symbol the light load lets
+the driver drop the GPU clock from 918 to 306 MHz, tripling the kernel's time (2.71 → 8.05 ms);
+pinning the clock is a system setting, left unchanged. Details: [docs/twin/](docs/twin/README.md).
+
+Step 2 is complete: the transformer runs as hand-written CUDA kernels on the Jetson's GPU, equal to
+the PyTorch reference to 1e-6, and fast enough for the pipeline at either rate.
 
 ## Provenance
 

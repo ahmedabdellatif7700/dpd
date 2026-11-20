@@ -21,6 +21,7 @@ The weights files are named after the test PA they were trained on, not after a 
 | `tools/model_check.h` | the check both tools share: a model against a golden file |
 | `tools/golden_check.cpp` | `CpuModel` against a golden file, and its speed on one core |
 | `tools/cuda_check.cpp` | `GpuModel` against a golden file and against `CpuModel`, and the kernel's speed |
+| `tools/dpd_bench.cpp` | the latency and throughput per frame on the GPU, as the stage will run it (`scripts/step2_timing.sh`) |
 | `tools/dpd_apply.cpp` | predistorts a drive file on the GPU or the CPU: the bridge to the Python checks |
 | `tools/gpu_check.cu` | the image's GPU self-test |
 | `CMakeLists.txt`, `Makefile` | the libraries `dpd_core` (CPU) and `dpd_gpu` (CUDA), the tools, the ctest checks |
@@ -152,5 +153,33 @@ reasoning and measurement instead.
 
 The pipeline streams 5 000 symbols/s (the testbed of paper 1), so the DPD must keep up with
 40 000 samples/s at 8 samples per symbol, or 250 000 at the BASEBAND frame's 50: the kernel now
-meets both, with 54 % to spare at 50. The timing with the copies and the per-frame latency is
-part 5.
+meets both, with 54 % to spare at 50.
+
+### Per frame, as the stage will run it
+
+`dpd_bench` times what the stage does with each frame: copy it to the GPU, run the kernel, copy the
+result back, wait (one CUDA stream); 1 000 frames per run, wall time on the host
+(`scripts/step2_timing.sh`, `results/step2_timing.txt`). Two frame sizes: the BASEBAND frame at 50
+samples per symbol (6400) and the same 128 symbols at 8 (1024), should the stage resample. Back to
+back, and paced at the pipeline's arrival rate: a 128-symbol frame every 25.6 ms at 5 000 symbols/s.
+
+| Frame | Frames | Latency, median / p99 / max | Kernel alone, median | GPU busy |
+|---|---|---|---|---|
+| 6400 | back to back | 16.8 / 17.1 / 17.4 ms | 16.67 ms | |
+| 6400 | **paced every 25.6 ms** | **17.3 / 17.5 / 17.6 ms** | 17.13 ms | 67 % |
+| 1024 | back to back | 2.8 / 3.0 / 3.2 ms | 2.71 ms | |
+| 1024 | **paced every 25.6 ms** | **8.9 / 9.1 / 9.2 ms** | 8.05 ms | 35 % |
+
+- **Both rates keep up** with the pipeline: the largest latency, 17.6 ms at 50 samples per symbol,
+  stays 8 ms inside the 25.6 ms between frames. Back to back, the GPU could take 380 000 samples/s
+  (6400) or 366 000 (1024).
+- **The copies cost 0.06 to 0.13 ms** per frame: the Jetson's CPU and GPU share their memory.
+  Pinned and pageable host memory perform alike (pageable showed one outlier of 20 ms in 1 000
+  frames; the stage uses pinned).
+- **The GPU's clock follows its load.** The driver sets it (25 W mode, 306 to 918 MHz): at 6400
+  samples a frame the GPU is busy 67 % of the time and runs at 918 MHz; at 1024 it is busy 35 % and
+  drops to 306 MHz, which makes the kernel three times slower (8.05 ms against 2.71 ms; the clock
+  read during the runs). Pinning the clock at 918 MHz would bring the 8-samples-per-symbol latency
+  to about 2.8 ms; that is a system setting of the Jetson, left as it is.
+- Not in these figures: the stage's own frame handling, and the 15 samples of look-ahead the window
+  needs from the next frame (step 3).

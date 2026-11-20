@@ -16,6 +16,8 @@ python scripts/export_model.py          # the weights and golden files for the t
                                         # results/models/*.dpdt, results/models/golden/*.dpdt
 python scripts/twin_check.py            # the twin (cpp/bin/dpd_apply, after make -C cpp) through the
                                         # test PA against the reference: results/step2_twin.txt
+scripts/step2_timing.sh                 # latency and throughput per frame on the GPU, ~2 min:
+                                        # results/step2_timing.txt
 ```
 
 `step1_check.py` takes `--device cpu|cuda`, `--passes`, `--epochs`, `--n-train`, `--n-eval`. A new

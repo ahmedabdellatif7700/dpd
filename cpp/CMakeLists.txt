@@ -57,6 +57,10 @@ target_link_libraries(cuda_check PRIVATE dpd_gpu)
 add_executable(dpd_apply tools/dpd_apply.cpp)
 target_link_libraries(dpd_apply PRIVATE dpd_gpu)
 
+# latency and throughput per frame on the GPU, as the stage will run it
+add_executable(dpd_bench tools/dpd_bench.cpp)
+target_link_libraries(dpd_bench PRIVATE dpd_gpu)
+
 # the image's self-test: the GPU from inside the container
 add_executable(gpu_check tools/gpu_check.cu)
 
