@@ -59,7 +59,7 @@ Details: [docs/howto/jetson.md](docs/howto/jetson.md).
 |---|---|---|---|
 | 1 | Reference transformer DPD in PyTorch; ILA on a test PA; NMSE and EVM with and without the DPD | `dpd/`, `tests/`, `scripts/step1_check.py`, `results/step1.txt` | done |
 | — | Container base: the stage's image (CUDA 13.2, sm_87) and the C++ build | `docker/`, `cpp/` | done |
-| 2 | The transformer as hand-written CUDA kernels on the Jetson's GPU (float32): checked against the reference; throughput at the BASEBAND frame size | `dpd/export.py`, `cpp/` | in progress (branch `cuda-kernels`): parts 1-2 of 5 done |
+| 2 | The transformer as hand-written CUDA kernels on the Jetson's GPU (float32): checked against the reference; throughput at the BASEBAND frame size | `dpd/export.py`, `cpp/` | in progress (branch `cuda-kernels`): parts 1-3 of 5 done |
 | 3 | The `dpd` stage: frame v2 and the stage contract (a copy of the Pi's stage library), `bypass` and `dpd` modes, the PA tap; tested with a Python feeder and sink; the hookup to the Pi proposed | `cpp/`, `docker/`, `tests/` | |
 
 ## Open decisions
@@ -131,7 +131,18 @@ image): output error 1.0e-6 and 9.2e-7, every probed intermediate within 1.4e-6 
 RMS; float32 rounding, which does not grow through the layers). 1 200 samples/s on one CPU core.
 Details: [docs/twin/](docs/twin/README.md).
 
-Plan of the rest of step 2: (3) the CUDA kernels, one fused kernel per frame first, then optimized; (4) the check against the
+### Step 2, part 3 — the fused CUDA kernel (2026-11-20)
+
+`GpuModel` (`cpp/src/gpu_model.cu`): the transformer as one CUDA kernel per frame, one 128-thread
+block per output sample, the window and every intermediate in shared memory, a warp per token (the
+width, 32, is a warp's). `CpuModel` now has the same interface (`predistort`, `trace`), and both are
+checked by the same code (`cpp/tools/model_check.h`). Against the golden files: output within 8.0e-7
+and 9.2e-7 of the reference, every intermediate within 1.7e-6, and within 7.6e-7 of `CpuModel`; the
+same in the image. Speed, the kernel alone: **45.5 ms per 6400-sample frame, 141 000 samples/s**,
+117 times one CPU core; enough for the 40 000 samples/s of 5 000 symbols/s at 8 samples per symbol,
+not for the 250 000 at 50. Details: [docs/twin/](docs/twin/README.md).
+
+Plan of the rest of step 2: (3, continued) the kernel optimized, each change measured; (4) the check against the
 reference, and the PA-output NMSE and EVM with the twin; (5) the throughput and latency per frame.
 
 ## Provenance

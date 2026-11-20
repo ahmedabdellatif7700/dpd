@@ -40,9 +40,18 @@ add_library(dpd_core STATIC
 )
 target_include_directories(dpd_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
+# the model on the GPU: one fused CUDA kernel per frame
+find_package(CUDAToolkit REQUIRED)
+add_library(dpd_gpu STATIC src/gpu_model.cu)
+target_link_libraries(dpd_gpu PUBLIC dpd_core CUDA::cudart)
+
 # the C++ model against the PyTorch reference's golden files
 add_executable(golden_check tools/golden_check.cpp)
 target_link_libraries(golden_check PRIVATE dpd_core)
+
+# the CUDA kernel against the golden files and the C++ model, and a first timing
+add_executable(cuda_check tools/cuda_check.cpp)
+target_link_libraries(cuda_check PRIVATE dpd_gpu)
 
 # the image's self-test: the GPU from inside the container
 add_executable(gpu_check tools/gpu_check.cu)
@@ -53,6 +62,8 @@ set(MODELS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../results/models" CACHE PATH "the e
 foreach(MODEL transformer_nominal transformer_nominal_memory)
     add_test(NAME golden_${MODEL}
         COMMAND golden_check ${MODELS_DIR}/${MODEL}.dpdt ${MODELS_DIR}/golden/${MODEL}.dpdt)
+    add_test(NAME cuda_${MODEL}
+        COMMAND cuda_check ${MODELS_DIR}/${MODEL}.dpdt ${MODELS_DIR}/golden/${MODEL}.dpdt --reps 20)
 endforeach()
 
 message(STATUS "")

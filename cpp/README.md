@@ -1,9 +1,9 @@
 # cpp
 
 The C++/CUDA twin of the reference DPD (inference only, the reference's weights) and, in step 3,
-the `dpd` stage around it. Today: the DPDT reader, the weights, the model in plain C++ on the CPU
-(`src/`, `include/dpd/`), its check against the reference's golden files and the image's GPU
-self-test (`tools/`). `make`, `make test`, `make run`, `make debug`, `make clean` on the host;
+the `dpd` stage around it. Today: the DPDT reader, the weights, `CpuModel` (plain C++) and
+`GpuModel` (one fused CUDA kernel) with the same interface (`src/`, `include/dpd/`), their checks
+against the reference's golden files and the image's GPU self-test (`tools/`). `make`, `make test`, `make run`, `make debug`, `make clean` on the host;
 `make -C ../docker check` in the image.
 
 Docs: [docs/twin/](../docs/twin/README.md), what it computes:

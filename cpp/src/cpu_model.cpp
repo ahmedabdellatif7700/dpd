@@ -3,6 +3,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
 namespace dpd {
 
@@ -48,14 +51,13 @@ void window_at(const Config& c, const float* x, std::size_t n, std::size_t i, fl
 void forward_window(const Weights& w, const float* win, float* out, Trace* trace) {
     const Config& c = w.cfg;
     const int T = c.window, d = c.d_model, h = c.n_heads, dh = c.d_head(), f = c.d_ff, ctr = c.centre();
-    const float inv_s = 1.0f / w.scale;
     const float att_scale = 1.0f / std::sqrt(static_cast<float>(dh));
 
     std::vector<float> z(2 * T), e(T * d), a(T * d), qkv(T * 3 * d), o(T * d), tmp(std::max(d, f)), hid(f),
         S(T);
 
     // input scale, embedding and position
-    for (int t = 0; t < 2 * T; ++t) z[t] = win[t] * inv_s;
+    for (int t = 0; t < 2 * T; ++t) z[t] = win[t] / w.scale;
     for (int t = 0; t < T; ++t) {
         linear(w.embed_w.data(), w.embed_b.data(), &z[2 * t], 2, d, &e[t * d]);
         for (int i = 0; i < d; ++i) e[t * d + i] += w.pos[t * d + i];
@@ -119,12 +121,40 @@ void forward_window(const Weights& w, const float* win, float* out, Trace* trace
     out[1] = y[1] * w.scale;
 }
 
-void predistort(const Weights& w, const float* x, std::size_t n, float* y) {
-    std::vector<float> win(2 * w.cfg.window);
-    for (std::size_t i = 0; i < n; ++i) {
-        window_at(w.cfg, x, n, i, win.data());
-        forward_window(w, win.data(), &y[2 * i]);
+CpuModel::CpuModel(const Weights& w) : w_(w) {}
+
+void CpuModel::predistort(const float* x, float* y, int n) const {
+    std::vector<float> win(2 * w_.cfg.window);
+    for (int i = 0; i < n; ++i) {
+        window_at(w_.cfg, x, n, i, win.data());
+        forward_window(w_, win.data(), &y[2 * i]);
     }
+}
+
+std::size_t CpuModel::trace_floats_per_probe() const {
+    const auto& c = w_.cfg;
+    return static_cast<std::size_t>(c.n_layers + 1) * c.window * c.d_model + c.d_model + 2;
+}
+
+std::vector<float> CpuModel::trace(const float* x, int n, const std::vector<int>& probes) const {
+    for (int p : probes)
+        if (p < 0 || p >= n)
+            throw std::runtime_error("trace: probe " + std::to_string(p) + " outside the frame of " + std::to_string(n));
+    const std::size_t per = trace_floats_per_probe(), td = static_cast<std::size_t>(w_.cfg.window) * w_.cfg.d_model;
+    std::vector<float> out(probes.size() * per), win(2 * w_.cfg.window);
+    for (std::size_t p = 0; p < probes.size(); ++p) {
+        Trace t;
+        float y[2];
+        window_at(w_.cfg, x, n, probes[p], win.data());
+        forward_window(w_, win.data(), y, &t);
+        float* o = &out[p * per];
+        std::copy(t.embed.begin(), t.embed.end(), o);
+        for (std::size_t l = 0; l < t.layer.size(); ++l) std::copy(t.layer[l].begin(), t.layer[l].end(), o + (l + 1) * td);
+        std::copy(t.final_norm.begin(), t.final_norm.end(), o + (t.layer.size() + 1) * td);
+        o[per - 2] = t.out[0];
+        o[per - 1] = t.out[1];
+    }
+    return out;
 }
 
 }  // namespace dpd

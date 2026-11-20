@@ -47,8 +47,9 @@ The pipeline the stage plugs into is documented in on-chip-training: `docs/testb
 | reference DPD by ILA | no DPD, nominal PA, test sequence | NMSE -14.9 → -48.5 dB, EVM 17.3 → 0.20 % (step 1) |
 | exported weights (`.dpdt`) | the trained model | identical outputs, bit for bit (`scripts/export_model.py`, `tests/test_export.py`) |
 | the image | the CPU | a kernel on one 6400-sample frame, error 0 (`gpu_check`) |
-| C++ model on the CPU (`cpp/`) | the reference's golden files: output and every layer of 8 probes | within 1.4e-6 (`make -C cpp test`, also in the image) |
-| CUDA kernels | the C++ model and the reference | step 2 |
+| `CpuModel`, C++ on the CPU (`cpp/`) | the reference's golden files: output and every layer of 8 probes | within 1.9e-6 (`make -C cpp test`, also in the image) |
+| `GpuModel`, the fused CUDA kernel | the golden files, and `CpuModel` | within 1.7e-6, and 7.6e-7 of `CpuModel` (`make -C cpp test`, also in the image) |
+| the twin through the test PA | the reference's NMSE and EVM | step 2, part 4 |
 | the `dpd` stage | the stage contract, the reference offline | step 3 |
 
 ## Not done yet
