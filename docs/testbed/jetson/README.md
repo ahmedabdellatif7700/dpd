@@ -118,6 +118,11 @@ images above.
 | 26.05-py3 | 13.2.1 | 10.16.1 | 2.12 | yes (the newest that does) |
 | 26.06-py3 and later | 13.3–13.4 | 11.x | 2.13–2.15 | no |
 
+## The stage (step 3)
+
+The three decisions it is built on (κ, the DPD's rate, frame boundaries), with the facts, the
+options and the choice made (2026-11-20): [STAGE.md](STAGE.md).
+
 ## Running
 
 On the Jetson and from the laptop: [docs/howto/jetson.md](../../howto/jetson.md).

@@ -62,21 +62,21 @@ Details: [docs/howto/jetson.md](docs/howto/jetson.md).
 | 2 | The transformer as hand-written CUDA kernels on the Jetson's GPU (float32): checked against the reference; throughput at the BASEBAND frame size | `dpd/export.py`, `cpp/` | done (branch `cuda-kernels`, to merge after review) |
 | 3 | The `dpd` stage: frame v2 and the stage contract (a copy of the Pi's stage library), `bypass` and `dpd` modes, the PA tap; tested with a Python feeder and sink; the hookup to the Pi proposed | `cpp/`, `docker/`, `tests/` | |
 
-## Open decisions
+## Decisions for the stage (2026-11-20)
 
-- **Drive scale κ.** `co_optics` computes κ from the calibration block it receives; with a DPD in
-  front, that block is predistorted, whereas the MATLAB DPD acts on `κ·s` with κ from the
-  undistorted signal. A proposal for how `dpd_bb` and `co_optics` agree on κ comes with step 3.
-- **The DPD's rate.** The reference model runs at 8 samples per symbol (3.2 GS/s, the rate of the
-  DPD plan); the pipeline's BASEBAND is at 50 (20 GS/s). Either the stage resamples around the
-  model, or the model is trained at 50. To settle before step 3.
-- **Frame boundaries.** The model's window reaches 16 samples back and 15 ahead. The reference and
-  the golden file take a frame alone (zeros beyond its ends); in the pipeline, consecutive
-  BASEBAND frames are one continuous drive, so the stage must keep the previous frame's last 16
-  samples and wait for the next frame's first 15 (a 15-sample delay, one frame of look-ahead).
-  How that fits the one-frame-in, one-frame-out rule comes with step 3.
-- **The PA with memory.** ILA stops at -16 dB NMSE when the PA's memory option is on (off in the
-  nominal link); left to the model screens.
+Facts, options and measurements: [docs/testbed/jetson/STAGE.md](docs/testbed/jetson/STAGE.md).
+
+- **Drive scale κ: 1a.** `dpd_bb` holds the calibration block, computes κ from the undistorted
+  signal with `co_optics`'s formula and writes it into its `pipeline` line; `co_optics` uses it
+  (a small change on the Pi, prepared as a patch for the user). Without it κ would fall to 0.65 of
+  its value (−3.7 to −3.9 dB) on the predistorted block.
+- **Rate: 2b.** The model runs at 8 samples per symbol; the stage resamples 50 → 8 → 50, with one
+  resampler in the reference and the twin, checked like the model.
+- **Frame boundaries: 3a.** Each frame is predistorted alone, zeros beyond its ends: no delay, no
+  state; measured at most 0.1 dB at the model, to be measured again with the resampler.
+
+Still open: **the PA with memory** (ILA stops at −16 dB NMSE when the PA's memory option is on, off
+in the nominal link); left to the model screens.
 
 ## Record
 
