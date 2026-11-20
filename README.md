@@ -21,7 +21,7 @@ The twin is checked against the reference: same input, same output within float3
 
 Documentation: **[docs/](docs/README.md)** — how to run ([howto/](docs/howto/README.md)), the
 reference ([dpd/](docs/dpd/README.md)) and every equation it computes
-([METHODOLOGY](docs/dpd/METHODOLOGY.md)), the Jetson and the image ([testbed/jetson/](docs/testbed/jetson/README.md)).
+([METHODOLOGY](docs/dpd/METHODOLOGY.md)), the Jetson and the image ([testbed/jetson/](docs/testbed/jetson/README.md)), the twin ([twin/](docs/twin/README.md)).
 
 ## Layout
 
@@ -29,7 +29,8 @@ reference ([dpd/](docs/dpd/README.md)) and every equation it computes
 dpd/                the reference DPD (Python package)
 tests/              its unit tests (pytest)
 scripts/            checks that produce results/ (step1_check.py)
-results/            step reports, trained weights (results/models/*.pt, 84 kB each)
+results/            step reports; trained models (results/models/: *.pt for PyTorch, *.dpdt for the
+                    twin, golden/*.dpdt to check it)
 cpp/                the C++/CUDA twin and the stage (CMake)
 docker/             the stage's image and compose service
 docs/               documentation
@@ -44,8 +45,9 @@ under [Provenance](#provenance).
 
 ```bash
 conda activate machine-learning
-python -m pytest -q                                  # unit tests, ~80 s
+python -m pytest -q                                  # unit tests, ~100 s
 python scripts/step1_check.py --device cuda          # ILA on the test PA, ~6 min (run in tmux)
+make -C cpp test                                     # the C++ model against the reference (golden files)
 make -C docker check                                 # build the image, GPU self-test in the container
 ```
 
@@ -57,7 +59,7 @@ Details: [docs/howto/jetson.md](docs/howto/jetson.md).
 |---|---|---|---|
 | 1 | Reference transformer DPD in PyTorch; ILA on a test PA; NMSE and EVM with and without the DPD | `dpd/`, `tests/`, `scripts/step1_check.py`, `results/step1.txt` | done |
 | — | Container base: the stage's image (CUDA 13.2, sm_87) and the C++ build | `docker/`, `cpp/` | done |
-| 2 | The transformer as hand-written CUDA kernels on the Jetson's GPU (float32): checked against the reference; throughput at the BASEBAND frame size | `cpp/` | next (branch `cuda-kernels`) |
+| 2 | The transformer as hand-written CUDA kernels on the Jetson's GPU (float32): checked against the reference; throughput at the BASEBAND frame size | `dpd/export.py`, `cpp/` | done (branch `cuda-kernels`, to merge after review) |
 | 3 | The `dpd` stage: frame v2 and the stage contract (a copy of the Pi's stage library), `bypass` and `dpd` modes, the PA tap; tested with a Python feeder and sink; the hookup to the Pi proposed | `cpp/`, `docker/`, `tests/` | |
 
 ## Open decisions
@@ -68,6 +70,11 @@ Details: [docs/howto/jetson.md](docs/howto/jetson.md).
 - **The DPD's rate.** The reference model runs at 8 samples per symbol (3.2 GS/s, the rate of the
   DPD plan); the pipeline's BASEBAND is at 50 (20 GS/s). Either the stage resamples around the
   model, or the model is trained at 50. To settle before step 3.
+- **Frame boundaries.** The model's window reaches 16 samples back and 15 ahead. The reference and
+  the golden file take a frame alone (zeros beyond its ends); in the pipeline, consecutive
+  BASEBAND frames are one continuous drive, so the stage must keep the previous frame's last 16
+  samples and wait for the next frame's first 15 (a 15-sample delay, one frame of look-ahead).
+  How that fits the one-frame-in, one-frame-out rule comes with step 3.
 - **The PA with memory.** ILA stops at -16 dB NMSE when the PA's memory option is on (off in the
   nominal link); left to the model screens.
 
@@ -105,6 +112,66 @@ run on `nvidia/cuda:13.2.0-runtime`, with the NVIDIA runtime; compose service `d
 self-test, `gpu_check`, finds the Orin (CC 8.7, 8 SMs, CUDA runtime and driver 13.2) from inside
 the container and runs a kernel on one BASEBAND frame (6400 samples) with error 0. Design and
 the templates it follows: [docs/testbed/jetson/](docs/testbed/jetson/README.md).
+
+### Step 2, part 1 — export for the twin (2026-11-17)
+
+The reference writes what the C++/CUDA twin reads, in one plain format of named float32 tensors
+([FORMAT](docs/dpd/FORMAT.md)): the weights (`results/models/*.dpdt`, 74.5 kB, 33 tensors) and a
+golden file per model (`results/models/golden/*.dpdt`, 202 kB): a 6400-sample BASEBAND-sized frame,
+its output, and the intermediate values (after the embedding, each layer, the final norm) of 8
+probed samples at the frame's ends and middle. The weights load back into the reference with
+outputs identical bit for bit. 24 unit tests pass.
+
+### Step 2, part 2 — the model in plain C++ (2026-11-17)
+
+`cpp/`: the DPDT reader, the weights (every shape checked), and the forward pass in plain C++,
+float32, transcribed from [METHODOLOGY](docs/dpd/METHODOLOGY.md): the twin's own reference for the
+CUDA kernels. Against the golden files of both models (`make -C cpp test`, ctest; the same in the
+image): output error 1.0e-6 and 9.2e-7, every probed intermediate within 1.4e-6 (relative to the
+RMS; float32 rounding, which does not grow through the layers). 1 200 samples/s on one CPU core.
+Details: [docs/twin/](docs/twin/README.md).
+
+### Step 2, part 3 — the fused CUDA kernel (2026-11-20)
+
+`GpuModel` (`cpp/src/gpu_model.cu`): the transformer as one CUDA kernel per frame, one 128-thread
+block per output sample, the window and every intermediate in shared memory, a warp per token (the
+width, 32, is a warp's). `CpuModel` now has the same interface (`predistort`, `trace`), and both are
+checked by the same code (`cpp/tools/model_check.h`). Against the golden files: output within 8.0e-7
+and 9.2e-7 of the reference, every intermediate within 1.7e-6, and within 7.6e-7 of `CpuModel`; the
+same in the image. Speed, the kernel alone: **45.5 ms per 6400-sample frame, 141 000 samples/s**,
+117 times one CPU core; enough for the 40 000 samples/s of 5 000 symbols/s at 8 samples per symbol,
+not for the 250 000 at 50. Details: [docs/twin/](docs/twin/README.md).
+
+### Step 2, part 3 (continued) — the kernel optimized (2026-11-20)
+
+Four changes, each measured and each giving bit-identical outputs: the last layer for the centre
+token only (45.5 → 27.0 ms per frame), 8 tokens per warp at once (→ 25.5 ms), no shared-memory bank
+conflict in the attention (→ 20.4 ms), inputs read four at a time (→ **16.65 ms per 6400-sample
+frame, 384 000 samples/s**). 2.73 times the first version; the 250 000 samples/s that 5 000
+symbols/s need at 50 samples per symbol are met with 54 % to spare. Details:
+[docs/twin/](docs/twin/README.md).
+
+### Step 2, part 4 — the twin through the test PA (2026-11-20)
+
+`scripts/twin_check.py`: the step 1 validation and test drives predistorted by the reference and by
+the twin (`cpp/bin/dpd_apply`, GPU and CPU), then through the test PA. The twin's outputs are within
+8.8e-7 of the reference's, and its NMSE and EVM equal the reference's to 9e-7 (dB, %), for both models:
+nominal PA -48.446 dB and 0.205 % on the test sequence, as the reference. The step 1 drive and
+measures moved into `dpd/evaluate.py`, shared by both checks (step 1's numbers unchanged). 27 unit
+tests pass, among them the twin on a short drive. Details: [docs/twin/](docs/twin/README.md).
+
+### Step 2, part 5 — latency and throughput per frame (2026-11-20)
+
+`cpp/tools/dpd_bench` times each frame as the stage will run it: copy in, kernel, copy out
+(`scripts/step2_timing.sh`, `results/step2_timing.txt`). Paced at the pipeline's rate (a 128-symbol
+frame every 25.6 ms), the latency is **17.3 ms median, 17.6 ms at most at 50 samples per symbol**
+(6400-sample frames, the GPU busy 67 %), and **8.9 ms median at 8** (1024-sample frames): both keep
+up. The copies cost 0.06 to 0.13 ms (shared memory). At 8 samples per symbol the light load lets
+the driver drop the GPU clock from 918 to 306 MHz, tripling the kernel's time (2.71 → 8.05 ms);
+pinning the clock is a system setting, left unchanged. Details: [docs/twin/](docs/twin/README.md).
+
+Step 2 is complete: the transformer runs as hand-written CUDA kernels on the Jetson's GPU, equal to
+the PyTorch reference to 1e-6, and fast enough for the pipeline at either rate.
 
 ## Provenance
 

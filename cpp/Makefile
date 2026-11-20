@@ -10,7 +10,7 @@ JOBS       ?= 4
 CUDA_ARCH  ?= 87
 NVCC       ?= /usr/local/cuda/bin/nvcc
 
-.PHONY: build run debug clean
+.PHONY: build run test debug clean
 
 build:
 	@echo
@@ -25,6 +25,9 @@ run: build
 	@echo
 	@echo "Running the GPU self-test..."
 	@./$(BIN_DIR)/gpu_check
+
+test: build
+	@ctest --test-dir $(BUILD_DIR) --output-on-failure
 
 debug:
 	@$(MAKE) build BUILD_TYPE=Debug

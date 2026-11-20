@@ -8,10 +8,16 @@
 ```bash
 git pull
 conda activate machine-learning        # ~/miniconda3; created from environment.yml
-python -m pytest -q                     # the unit tests, ~80 s (CPU, and CUDA where present)
+python -m pytest -q                     # the unit tests, ~100 s (CPU, and CUDA and the twin where built)
 tmux new -s step1 'python scripts/step1_check.py --device cuda'
                                         # ILA on the test PA, ~6 min on the GPU:
                                         # results/step1.txt, step1.json, results/models/*.pt
+python scripts/export_model.py          # the weights and golden files for the twin:
+                                        # results/models/*.dpdt, results/models/golden/*.dpdt
+python scripts/twin_check.py            # the twin (cpp/bin/dpd_apply, after make -C cpp) through the
+                                        # test PA against the reference: results/step2_twin.txt
+scripts/step2_timing.sh                 # latency and throughput per frame on the GPU, ~2 min:
+                                        # results/step2_timing.txt
 ```
 
 `step1_check.py` takes `--device cpu|cuda`, `--passes`, `--epochs`, `--n-train`, `--n-eval`. A new
@@ -26,6 +32,14 @@ make -C docker build                    # the image arof-dpd:local (compiles cpp
 make -C docker check                    # build, then the GPU self-test in the container
 make -C docker shell                    # a shell in the image, GPU attached
 make -C cpp run                         # the same C++/CUDA build on the host (nvcc 13.2, no Docker)
+make -C cpp test                        # the C++ model against the reference's golden files (ctest)
+```
+
+In the image, against the golden files (the models are mounted at `/models`):
+
+```bash
+docker compose -f docker/compose.yaml run --rm dpd_bb \
+    golden_check /models/transformer_nominal.dpdt /models/golden/transformer_nominal.dpdt
 ```
 
 `make -C docker check` should print the CUDA runtime and driver 13.2, the device `Orin` (8.7) and

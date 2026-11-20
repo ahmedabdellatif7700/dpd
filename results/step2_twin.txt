@@ -1,0 +1,24 @@
+Step 2, part 4: the C++/CUDA twin (cpp/bin/dpd_apply) through the test PA, against the PyTorch reference; 2048 symbols at 8 samples per symbol per sequence
+output error: the largest difference from the reference's output over its RMS; NMSE (dB) and EVM (%) at the PA's output
+
+model                        sequence   DPD        output error      NMSE   EVM wf  EVM sym
+-------------------------------------------------------------------------------------------
+transformer_nominal          validation none                      -14.843   17.572   17.277
+transformer_nominal          validation PyTorch                   -48.831    0.213    0.198
+transformer_nominal          validation twin GPU       5.71e-07   -48.831    0.213    0.198
+transformer_nominal          validation twin CPU       7.28e-07   -48.831    0.213    0.198
+transformer_nominal          test       none                      -14.860   17.560   17.294
+transformer_nominal          test       PyTorch                   -48.446    0.223    0.205
+transformer_nominal          test       twin GPU       5.72e-07   -48.446    0.223    0.205
+transformer_nominal          test       twin CPU       7.15e-07   -48.446    0.223    0.205
+transformer_nominal_memory   validation none                      -10.606   28.707   27.386
+transformer_nominal_memory   validation PyTorch                   -16.117    9.862    7.868
+transformer_nominal_memory   validation twin GPU       7.85e-07   -16.117    9.862    7.868
+transformer_nominal_memory   validation twin CPU       8.08e-07   -16.117    9.862    7.868
+transformer_nominal_memory   test       none                      -10.644   28.612   27.356
+transformer_nominal_memory   test       PyTorch                   -16.192    9.887    7.958
+transformer_nominal_memory   test       twin GPU       8.83e-07   -16.192    9.887    7.958
+transformer_nominal_memory   test       twin CPU       7.50e-07   -16.192    9.887    7.958
+
+largest output error 8.8e-07; largest NMSE/EVM difference from the reference 9.1e-07 (dB, %)
+tolerances: output 1e-05, NMSE and EVM 0.01: OK

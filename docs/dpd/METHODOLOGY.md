@@ -91,12 +91,13 @@ Multiply-accumulates per output sample, the whole window encoded (`TransformerDP
 | head | 2·d | 64 |
 | **total, 2 layers** | | **657 472** (1.31 MFLOP) |
 
-Layer norms, softmax and GELU are not counted. Two savings are exact and left to the twin:
+Layer norms, softmax and GELU are not counted. One saving is exact: the last layer needs K and V
+of all 32 tokens but its query, attention, output projection and feed-forward only for the centre
+token: 73 728 MAC instead of 327 680 (77 % of that layer, 39 % of the total), 403 520 MAC per sample
+in all. (The CUDA twin also computes the queries of all tokens, for simpler code: 435 264 MAC.)
 
-- the last layer needs K and V of all 32 tokens but its query, attention, output projection and
-  feed-forward only for the centre token: 73 728 MAC instead of 327 680 (77 % of that layer, 39 % of
-  the total), 403 520 MAC per sample in all;
-- the embeddings of neighbouring windows are the same samples at shifted positions.
+Neighbouring windows cannot share work: the position embedding makes one sample a different token
+in each window it belongs to, so after the embedding's first two multiplications nothing is common.
 
 ## 4. ILA (indirect learning)
 
