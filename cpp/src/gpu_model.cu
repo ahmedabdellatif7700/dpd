@@ -8,7 +8,9 @@
 //
 // Per layer, two phases separated by __syncthreads(): (1) layer norm and Q/K/V of every token;
 // (2) per token: attention over all tokens' K and V, the output projection and its residual, then
-// the feed-forward block and its residual (which needs only the token itself).
+// the feed-forward block and its residual (which needs only the token itself). Each warp owns 8
+// tokens and runs every matrix product on the 8 together, so each weight is loaded once for 8.
+// In the last layer only the centre token is computed past Q/K/V (the output reads only it).
 #include "dpd/gpu_model.h"
 
 #include <cuda_runtime.h>
@@ -29,6 +31,7 @@ constexpr int L = 2;    // layers
 constexpr int C = 16;   // centre
 constexpr int WARPS = 4;
 constexpr int THREADS = 32 * WARPS;
+constexpr int TPW = T / WARPS;  // tokens per warp: warp w owns tokens w, w + 4, ..., w + 28
 constexpr unsigned FULL = 0xffffffffu;
 // one probe's trace: embed, each layer [T][D], final_norm [D], out [2] (the golden file's layout)
 constexpr int TRACE_FLOATS = (L + 1) * T * D + D + 2;
@@ -83,17 +86,22 @@ __device__ __forceinline__ float layer_norm(float v, float w, float b) {
     const float var = warp_sum(d * d) * (1.0f / D);
     return d / sqrtf(var + 1e-5f) * w + b;
 }
+// x[i .. i+3] in one shared-memory load (x 16-byte aligned, i a multiple of 4)
+__device__ __forceinline__ float4 load4(const float* x, int i) { return *reinterpret_cast<const float4*>(x + i); }
+
 __device__ __forceinline__ float gelu(float u) { return 0.5f * u * (1.0f + erff(u * 0.70710678118654752f)); }
 
 __global__ void __launch_bounds__(THREADS) dpd_forward(KernelParams m, const float2* __restrict__ x,
                                                         float2* __restrict__ y, int n, const int* __restrict__ probes,
                                                         int n_probes, float* __restrict__ trace) {
     __shared__ float z[T][2];        // the window, scaled
-    __shared__ float e[T][D];        // the token stream (residual)
-    __shared__ float a[T][D];        // a norm's output, then the attention's
-    __shared__ float qkv[T][3 * D];  // q | k | v of each token
-    __shared__ float p[WARPS][H][T]; // the softmax numerators of a warp's token
-    __shared__ float hid[WARPS][F];  // the feed-forward hidden layer of a warp's token
+    __shared__ float e[T][D];                   // the token stream (residual)
+    __shared__ __align__(16) float a[T][D];     // a norm's output, then the attention's (read as float4)
+    // q | k | v of each token; one float of padding per row, so that the 32 lanes reading one
+    // column each (the attention scores read k of token u = lane) fall in 32 different banks
+    __shared__ float qkv[T][3 * D + 1];
+    __shared__ float p[WARPS][H][T];      // the softmax numerators of a warp's current token
+    __shared__ __align__(16) float hid[WARPS][TPW][F];  // the feed-forward hidden layer of a warp's tokens (float4)
 
     const int s = blockIdx.x;
     const int warp = threadIdx.x / 32, lane = threadIdx.x % 32;
@@ -125,30 +133,67 @@ __global__ void __launch_bounds__(THREADS) dpd_forward(KernelParams m, const flo
     if (tr)
         for (int i = threadIdx.x; i < T * D; i += THREADS) tr[i] = (&e[0][0])[i];
 
+    // Each warp works on its own TPW = 8 tokens (t = warp + WARPS * k) together: every weight is
+    // loaded once and applied to all of them, with one accumulator per token in registers. The
+    // sums are those of the per-token loop, in the same order.
     for (int l = 0; l < L; ++l) {
         const LayerParams& P = m.layer[l];
+        // the output reads only the centre token: in the last layer, only it needs attention and
+        // the feed-forward block (every token still needs its K and V). The trace keeps all.
+        const bool centre_only = (l == L - 1) && !trace;
+        bool on[TPW];  // the warp's tokens that phase 2 computes
+#pragma unroll
+        for (int k = 0; k < TPW; ++k) on[k] = !centre_only || warp + WARPS * k == C;
 
-        // phase 1: norm 1 and Q/K/V of every token; lane o computes q_o, k_o, v_o
-        for (int t = warp; t < T; t += WARPS) {
+        // phase 1: norm 1, then Q/K/V of the warp's tokens (all of them: attention needs every K, V)
+        for (int k = 0; k < TPW; ++k) {
+            const int t = warp + WARPS * k;
             a[t][lane] = layer_norm(e[t][lane], P.n1w[lane], P.n1b[lane]);
-            __syncwarp();
-            float q = P.inb[lane], k = P.inb[D + lane], v = P.inb[2 * D + lane];
-            for (int i = 0; i < D; ++i) {
-                const float ai = a[t][i];
-                const float* w = P.inT + i * 3 * D;
-                q += w[lane] * ai;
-                k += w[D + lane] * ai;
-                v += w[2 * D + lane] * ai;
-            }
-            qkv[t][lane] = q;
-            qkv[t][D + lane] = k;
-            qkv[t][2 * D + lane] = v;
         }
-        __syncthreads();
+        __syncwarp();
+        {
+            float q[TPW], kk[TPW], v[TPW];
+#pragma unroll
+            for (int k = 0; k < TPW; ++k) {
+                q[k] = P.inb[lane];
+                kk[k] = P.inb[D + lane];
+                v[k] = P.inb[2 * D + lane];
+            }
+            for (int i = 0; i < D; i += 4) {
+                float wq[4], wk[4], wv[4];
+#pragma unroll
+                for (int c = 0; c < 4; ++c) {
+                    const float* w = P.inT + (i + c) * 3 * D;
+                    wq[c] = w[lane];
+                    wk[c] = w[D + lane];
+                    wv[c] = w[2 * D + lane];
+                }
+#pragma unroll
+                for (int k = 0; k < TPW; ++k) {
+                    const float4 a4 = load4(a[warp + WARPS * k], i);
+                    const float ai[4] = {a4.x, a4.y, a4.z, a4.w};
+#pragma unroll
+                    for (int c = 0; c < 4; ++c) {
+                        q[k] += wq[c] * ai[c];
+                        kk[k] += wk[c] * ai[c];
+                        v[k] += wv[c] * ai[c];
+                    }
+                }
+            }
+#pragma unroll
+            for (int k = 0; k < TPW; ++k) {
+                const int t = warp + WARPS * k;
+                qkv[t][lane] = q[k];
+                qkv[t][D + lane] = kk[k];
+                qkv[t][2 * D + lane] = v[k];
+            }
+        }
+        __syncthreads();  // phase 2 reads every token's K and V
 
-        // phase 2, per token
-        for (int t = warp; t < T; t += WARPS) {
-            // scores of token t against every token u (lane = u), softmax per head
+        // phase 2a: attention of each of the warp's tokens (lane = u for the scores), into a[t]
+        for (int k = 0; k < TPW; ++k) {
+            if (!on[k]) continue;
+            const int t = warp + WARPS * k;
             float sums[H];
             for (int j = 0; j < H; ++j) {
                 float sc = 0.0f;
@@ -163,31 +208,101 @@ __global__ void __launch_bounds__(THREADS) dpd_forward(KernelParams m, const flo
             const int j = lane / DH;
             float acc = 0.0f;
             for (int u = 0; u < T; ++u) acc += p[warp][j][u] * qkv[u][2 * D + lane];
+            __syncwarp();  // p is rewritten for the next token
             a[t][lane] = acc / sums[j];
-            __syncwarp();
-            // output projection and residual
-            float r = P.outb[lane];
-            for (int i = 0; i < D; ++i) r += P.outT[i * D + lane] * a[t][i];
-            e[t][lane] += r;
-            __syncwarp();
-            // norm 2, feed-forward with GELU, residual
-            a[t][lane] = layer_norm(e[t][lane], P.n2w[lane], P.n2b[lane]);
-            __syncwarp();
-            float h0 = P.ff1b[lane], h1 = P.ff1b[lane + 32];
-            for (int i = 0; i < D; ++i) {
-                const float gi = a[t][i];
-                h0 += P.ff1T[i * F + lane] * gi;
-                h1 += P.ff1T[i * F + lane + 32] * gi;
-            }
-            hid[warp][lane] = gelu(h0);
-            hid[warp][lane + 32] = gelu(h1);
-            __syncwarp();
-            r = P.ff2b[lane];
-            for (int i = 0; i < F; ++i) r += P.ff2T[i * D + lane] * hid[warp][i];
-            e[t][lane] += r;
-            __syncwarp();
         }
-        __syncthreads();
+        __syncwarp();
+
+        // phase 2b: output projection and residual
+        {
+            float r[TPW];
+#pragma unroll
+            for (int k = 0; k < TPW; ++k) r[k] = P.outb[lane];
+            for (int i = 0; i < D; i += 4) {
+                float w[4];
+#pragma unroll
+                for (int c = 0; c < 4; ++c) w[c] = P.outT[(i + c) * D + lane];
+#pragma unroll
+                for (int k = 0; k < TPW; ++k)
+                    if (on[k]) {
+                        const float4 a4 = load4(a[warp + WARPS * k], i);
+                        r[k] += w[0] * a4.x;
+                        r[k] += w[1] * a4.y;
+                        r[k] += w[2] * a4.z;
+                        r[k] += w[3] * a4.w;
+                    }
+            }
+            __syncwarp();  // every lane has read a before norm 2 rewrites it
+#pragma unroll
+            for (int k = 0; k < TPW; ++k)
+                if (on[k]) {
+                    const int t = warp + WARPS * k;
+                    e[t][lane] += r[k];
+                    a[t][lane] = layer_norm(e[t][lane], P.n2w[lane], P.n2b[lane]);  // phase 2c: norm 2
+                }
+        }
+        __syncwarp();
+
+        // phase 2d: feed-forward, first layer with GELU (lane computes hidden units lane, lane + 32)
+        {
+            float h0[TPW], h1[TPW];
+#pragma unroll
+            for (int k = 0; k < TPW; ++k) {
+                h0[k] = P.ff1b[lane];
+                h1[k] = P.ff1b[lane + 32];
+            }
+            for (int i = 0; i < D; i += 4) {
+                float w0[4], w1[4];
+#pragma unroll
+                for (int c = 0; c < 4; ++c) {
+                    w0[c] = P.ff1T[(i + c) * F + lane];
+                    w1[c] = P.ff1T[(i + c) * F + lane + 32];
+                }
+#pragma unroll
+                for (int k = 0; k < TPW; ++k)
+                    if (on[k]) {
+                        const float4 g4 = load4(a[warp + WARPS * k], i);
+                        const float gi[4] = {g4.x, g4.y, g4.z, g4.w};
+#pragma unroll
+                        for (int c = 0; c < 4; ++c) {
+                            h0[k] += w0[c] * gi[c];
+                            h1[k] += w1[c] * gi[c];
+                        }
+                    }
+            }
+#pragma unroll
+            for (int k = 0; k < TPW; ++k)
+                if (on[k]) {
+                    hid[warp][k][lane] = gelu(h0[k]);
+                    hid[warp][k][lane + 32] = gelu(h1[k]);
+                }
+        }
+        __syncwarp();
+
+        // phase 2e: feed-forward, second layer, and residual
+        {
+            float r[TPW];
+#pragma unroll
+            for (int k = 0; k < TPW; ++k) r[k] = P.ff2b[lane];
+            for (int i = 0; i < F; i += 4) {
+                float w[4];
+#pragma unroll
+                for (int c = 0; c < 4; ++c) w[c] = P.ff2T[(i + c) * D + lane];
+#pragma unroll
+                for (int k = 0; k < TPW; ++k)
+                    if (on[k]) {
+                        const float4 h4 = load4(hid[warp][k], i);
+                        r[k] += w[0] * h4.x;
+                        r[k] += w[1] * h4.y;
+                        r[k] += w[2] * h4.z;
+                        r[k] += w[3] * h4.w;
+                    }
+            }
+#pragma unroll
+            for (int k = 0; k < TPW; ++k)
+                if (on[k]) e[warp + WARPS * k][lane] += r[k];
+        }
+        __syncthreads();  // the next layer's norm reads e; its Q/K/V overwrite qkv
         if (tr)
             for (int i = threadIdx.x; i < T * D; i += THREADS) tr[(l + 1) * T * D + i] = (&e[0][0])[i];
     }

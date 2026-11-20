@@ -142,7 +142,16 @@ same in the image. Speed, the kernel alone: **45.5 ms per 6400-sample frame, 141
 117 times one CPU core; enough for the 40 000 samples/s of 5 000 symbols/s at 8 samples per symbol,
 not for the 250 000 at 50. Details: [docs/twin/](docs/twin/README.md).
 
-Plan of the rest of step 2: (3, continued) the kernel optimized, each change measured; (4) the check against the
+### Step 2, part 3 (continued) — the kernel optimized (2026-11-20)
+
+Four changes, each measured and each giving bit-identical outputs: the last layer for the centre
+token only (45.5 → 27.0 ms per frame), 8 tokens per warp at once (→ 25.5 ms), no shared-memory bank
+conflict in the attention (→ 20.4 ms), inputs read four at a time (→ **16.65 ms per 6400-sample
+frame, 384 000 samples/s**). 2.73 times the first version; the 250 000 samples/s that 5 000
+symbols/s need at 50 samples per symbol are met with 54 % to spare. Details:
+[docs/twin/](docs/twin/README.md).
+
+Plan of the rest of step 2: (4) the check against the
 reference, and the PA-output NMSE and EVM with the twin; (5) the throughput and latency per frame.
 
 ## Provenance

@@ -75,9 +75,19 @@ One kernel launch computes a whole frame. Each output sample gets one thread blo
 - **One configuration.** The kernel is written for this model (window 32, width 32, 4 heads,
   2 layers, FF 64); `GpuModel` refuses any other configuration with an error naming it.
 
-This first version favours clarity over speed: every block encodes its whole window, although
-neighbouring windows share 31 of their 32 samples, and the last layer is computed for all tokens
-where only the centre one is read. Those are the optimizations that follow.
+- **Optimizations**, each kept only if it was measured faster and gave bit-identical outputs:
+  - *the last layer for the centre token only*: past its Q/K/V, the last layer computes only token
+    16, the one the output reads (in trace mode it still computes all, since the golden file
+    compares them);
+  - *8 tokens per warp at once*: each warp owns tokens w, w+4, …, w+28 and runs every matrix
+    product on the 8 together, one accumulator per token in registers, so each weight is loaded
+    once for 8 tokens;
+  - *no bank conflict in the attention*: the rows of `qkv` are padded to 97 floats, so the 32 lanes
+    that read one key each fall in 32 different shared-memory banks (with 96, all hit one bank);
+  - *inputs read four at a time*: the matrix products read their inputs with one `float4` load
+    instead of four, the summation order unchanged.
+
+  Resources: 96 registers per thread, 31.1 kB of shared memory per block, no spills.
 
 ## The checks against the reference
 
@@ -100,13 +110,25 @@ file without weights are each rejected.
 
 ## Speed
 
-One 6400-sample frame, the kernel alone with the frame already on the GPU (CUDA events, 200 runs):
+One 6400-sample frame, the kernel alone with the frame already on the GPU (CUDA events, 200 to
+1 000 runs, repeats within 0.04 %), the Jetson in its default 25 W mode (GPU clock up to 918 MHz,
+set by the driver; not pinned):
 
-| Implementation | Per frame | Samples/s |
-|---|---|---|
-| `CpuModel`, one Cortex-A78AE core | 5.3 s | 1 200 |
-| `GpuModel`, first version | 45.5 ms | 141 000 |
+| Implementation | Per frame | Samples/s | Gain |
+|---|---|---|---|
+| `CpuModel`, one Cortex-A78AE core | 5.3 s | 1 200 | |
+| `GpuModel`, first version | 45.5 ms | 141 000 | |
+| + last layer for the centre token only | 27.0 ms | 237 000 | 1.68 |
+| + 8 tokens per warp at once | 25.5 ms | 250 500 | 1.06 |
+| + no bank conflict in the attention | 20.4 ms | 313 000 | 1.25 |
+| + inputs read four at a time | **16.65 ms** | **384 000** | 1.23 |
+
+2.73 times the first version, 320 times one CPU core. Tried and dropped: the softmax sums in a
+register instead of a small array (no measurable gain). The profiler (Nsight Compute) needs access
+to the GPU's performance counters, which this user does not have; the limits were found by
+reasoning and measurement instead.
 
 The pipeline streams 5 000 symbols/s (the testbed of paper 1), so the DPD must keep up with
-40 000 samples/s at 8 samples per symbol, or 250 000 at the BASEBAND frame's 50: the first version
-meets the first, not the second. The timing with the copies and per-frame latency is part 5.
+40 000 samples/s at 8 samples per symbol, or 250 000 at the BASEBAND frame's 50: the kernel now
+meets both, with 54 % to spare at 50. The timing with the copies and the per-frame latency is
+part 5.
