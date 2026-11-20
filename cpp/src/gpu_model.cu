@@ -18,6 +18,8 @@
 #include <stdexcept>
 #include <string>
 
+#include "cuda_util.h"
+
 namespace dpd {
 
 namespace {
@@ -39,9 +41,8 @@ constexpr int TRACE_FLOATS = (L + 1) * T * D + D + 2;
 static_assert(D == 32, "the kernel maps the model width to the warp");
 static_assert(H * DH == D, "heads x per-head width = width");
 
-void check(cudaError_t e, const char* what) {
-    if (e != cudaSuccess) throw std::runtime_error(std::string(what) + ": " + cudaGetErrorString(e));
-}
+using cuda::check;
+using cuda::device_alloc;
 
 }  // namespace
 
@@ -56,20 +57,12 @@ struct KernelParams {
     LayerParams layer[L];
     const float *nw, *nb, *headw, *headb;
 };
-void CudaFree::operator()(void* p) const noexcept { cudaFree(p); }
 }  // namespace detail
 
 namespace {
 
 using detail::KernelParams;
 using detail::LayerParams;
-
-template <typename T>
-DeviceBuffer<T> device_alloc(std::size_t count, const char* what) {
-    T* p = nullptr;
-    check(cudaMalloc(&p, count * sizeof(T)), what);
-    return DeviceBuffer<T>(p);
-}
 
 __device__ __forceinline__ float warp_sum(float v) {
     for (int o = 16; o > 0; o >>= 1) v += __shfl_xor_sync(FULL, v, o);

@@ -60,7 +60,7 @@ Details: [docs/howto/jetson.md](docs/howto/jetson.md).
 | 1 | Reference transformer DPD in PyTorch; ILA on a test PA; NMSE and EVM with and without the DPD | `dpd/`, `tests/`, `scripts/step1_check.py`, `results/step1.txt` | done |
 | — | Container base: the stage's image (CUDA 13.2, sm_87) and the C++ build | `docker/`, `cpp/` | done |
 | 2 | The transformer as hand-written CUDA kernels on the Jetson's GPU (float32): checked against the reference; throughput at the BASEBAND frame size | `dpd/export.py`, `cpp/` | done (branch `cuda-kernels`, to merge after review) |
-| 3 | The `dpd` stage: frame v2 and the stage contract (a copy of the Pi's stage library), `bypass` and `dpd` modes, the PA tap; tested with a Python feeder and sink; the hookup to the Pi proposed | `cpp/`, `docker/`, `tests/` | |
+| 3 | The `dpd` stage: frame v2 and the stage contract (a copy of the Pi's stage library), `bypass` and `dpd` modes, the PA tap; tested with a Python feeder and sink; the hookup to the Pi proposed | `dpd/resample.py`, `dpd/stream.py`, `cpp/`, `docker/`, `tests/` | in progress (branch `dpd-stage`): the resampler done |
 
 ## Decisions for the stage (2026-11-20)
 
@@ -68,12 +68,15 @@ Facts, options and measurements: [docs/testbed/jetson/STAGE.md](docs/testbed/jet
 
 - **Drive scale κ: 1a.** `dpd_bb` holds the calibration block, computes κ from the undistorted
   signal with `co_optics`'s formula and writes it into its `pipeline` line; `co_optics` uses it
-  (a small change on the Pi, prepared as a patch for the user). Without it κ would fall to 0.65 of
+  (a small change on the Pi, prepared as a patch for the user, not applied). Without it κ would fall to 0.65 of
   its value (−3.7 to −3.9 dB) on the predistorted block.
 - **Rate: 2b.** The model runs at 8 samples per symbol; the stage resamples 50 → 8 → 50, with one
   resampler in the reference and the twin, checked like the model.
-- **Frame boundaries: 3a.** Each frame is predistorted alone, zeros beyond its ends: no delay, no
-  state; measured at most 0.1 dB at the model, to be measured again with the resampler.
+- **Frame boundaries: 3b** (first 3a; changed after the resampler's measurement). The stage holds
+  back the last 250 samples of each frame, as `fiber` does, so that the filters and the window see
+  the next frame: equal to the drive taken whole (-47.79 dB), where cutting each frame alone costs
+  12.5 dB (-35.25 dB). The calibration group is flushed whole; `co_optics` locates the block by
+  `first_sample` (in the same patch as κ).
 
 Still open: **the PA with memory** (ILA stops at −16 dB NMSE when the PA's memory option is on, off
 in the nominal link); left to the model screens.
@@ -172,6 +175,19 @@ pinning the clock is a system setting, left unchanged. Details: [docs/twin/](doc
 
 Step 2 is complete: the transformer runs as hand-written CUDA kernels on the Jetson's GPU, equal to
 the PyTorch reference to 1e-6, and fast enough for the pipeline at either rate.
+
+### Step 3, part 1 — the resampler (2026-11-20)
+
+`dpd/resample.py`: 50 ↔ 8 samples per symbol (4/25 and 25/4), one Kaiser low-pass at 80 GS/s
+(503 taps, 0.002 dB ripple to 1.2 GHz, 80 dB from 2.0 GHz), one explicit formula, equal to
+`scipy.signal.upfirdn` to 1e-15, aligned with the waveform made at 8 (−68.7 dB), round trip
+−70.8 dB. Through the test PA, the DPD at 50 samples per symbol through the resampler loses 0.7 dB
+against the reference at 8 (−47.79 against −48.45 dB, EVM 0.205 % both) on the drive whole, but
+**12.5 dB with each frame alone** (−35.25 dB): the filters ring at every cut. Decision 3 therefore
+changed from 3a to 3b (the user, 2026-11-20): `dpd/stream.py` holds back 250 samples per frame and
+gives the whole drive's transform to 1e-6. The twin's `CpuResampler` and `GpuResampler` match the
+reference within 8.8e-7 and take 0.065 ms per frame on the GPU. 36 unit tests and 5 ctest checks
+pass. `results/step3_resampler.txt`; [STAGE.md](docs/testbed/jetson/STAGE.md).
 
 ## Provenance
 

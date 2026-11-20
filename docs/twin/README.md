@@ -18,6 +18,9 @@ The weights files are named after the test PA they were trained on, not after a 
 | `include/dpd/weights.h`, `src/weights.cpp` | `Config`, `Weights`, `load_weights`: every tensor of the model, each shape checked against the config, no tensor left over |
 | `include/dpd/cpu_model.h`, `src/cpu_model.cpp` | `CpuModel`, the model in plain C++ on the CPU; underneath it `forward_window` (one window, with an optional trace) and `window_at` |
 | `include/dpd/gpu_model.h`, `src/gpu_model.cu` | `GpuModel`, the model as one fused CUDA kernel |
+| `include/dpd/resampler.h`, `cpu_resampler.h`, `gpu_resampler.h`; `src/cpu_resampler.cpp`, `src/gpu_resampler.cu` | the resampler 50 ↔ 8 (`ResamplerFilter`, `load_resampler`; `CpuResampler` and `GpuResampler`, one interface) |
+| `include/dpd/device_buffer.h`, `src/device_buffer.cu`, `src/cuda_util.h` | GPU memory owned by a `unique_ptr` (`DeviceBuffer`); `check` and `device_alloc` for the CUDA sources |
+| `tools/resampler_check.cpp` | the resampler, CPU and GPU, against its golden file, and its time per frame |
 | `tools/model_check.h` | the check both tools share: a model against a golden file |
 | `tools/golden_check.cpp` | `CpuModel` against a golden file, and its speed on one core |
 | `tools/cuda_check.cpp` | `GpuModel` against a golden file and against `CpuModel`, and the kernel's speed |
@@ -109,6 +112,15 @@ orders of summation: a few units in the last place of float32 (1.2e-7), and they
 through the layers. The same numbers come out of the image (`arof-dpd:local`, with
 `results/models/` mounted at `/models`). A mismatched model and golden file, a truncated file and a
 file without weights are each rejected.
+
+## The resampler
+
+The stage runs the model at 8 samples per symbol between two resamplings (decision 2b):
+`CpuResampler` and `GpuResampler` implement `dpd/resample.py`'s formula,
+`y[m] = up · Σₖ x[k] h[c + m·down − k·up]`, the same way (the GPU: one thread per output sample),
+with the reference's 503 taps (`results/models/resampler.dpdt`). Against the golden frame
+(`resampler_check`, ctest): 50 → 8 within 8.8e-7, 8 → 50 within 5.5e-7, CPU and GPU alike; on the
+GPU, 0.041 ms (50 → 8) and 0.024 ms (8 → 50) per 6400-sample frame, under 1 % of the model's time.
 
 ## Through the test PA
 

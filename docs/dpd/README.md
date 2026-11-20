@@ -13,6 +13,8 @@ and out, float32 inside, on the CPU or CUDA. Every equation and constant it comp
 | `signals.py` | 16QAM through the RRC filter, and the matched filter |
 | `metrics.py` | NMSE, the EVM of the waveform (in-band), the EVM of the symbols |
 | `export.py` | the weights and the golden files for the C++/CUDA twin ([FORMAT](FORMAT.md)) |
+| `resample.py` | the resampler between the pipeline's 50 samples per symbol and the model's 8 (one Kaiser low-pass at 80 GS/s, 503 taps, 80 dB) |
+| `stream.py` | `FrameStream`: the stage's frame-by-frame processing with a 250-sample holdback (decision 3b), the specification of the C++ stage |
 | `evaluate.py` | the test drive and the measures at the PA's output, shared by the checks of the reference and of the twin |
 
 ## The model
@@ -78,7 +80,7 @@ Step 1, `scripts/step1_check.py` on the GPU: 16QAM at 8 samples per symbol, 4096
 
 ## Tests
 
-`python -m pytest -q`, 27 tests, ~100 s:
+`python -m pytest -q`, 36 tests, ~110 s:
 
 | File | Checks |
 |---|---|
@@ -88,4 +90,6 @@ Step 1, `scripts/step1_check.py` on the GPU: 16QAM at 8 samples per symbol, 4096
 | `test_methodology.py` | [METHODOLOGY](METHODOLOGY.md), written again in numpy, against the model (1e-5) |
 | `test_export.py` | the file format byte for byte; the weights' round trip (bit-exact); the trace is the forward; the golden probes |
 | `test_ila.py` | a short ILA run improves NMSE by 6 dB and the EVM by 40 % |
+| `test_resample.py` | the filter, the lengths, the formula against `scipy.signal.upfirdn`, the alignment with the waveform made at 8, the round trip |
+| `test_stream.py` | the stream equal to the whole drive's transform, the flush of a calibration group, the grid |
 | `test_twin.py` | the C++/CUDA twin (`cpp/bin/dpd_apply`) against the reference on a short drive, GPU and CPU (skipped if not built) |

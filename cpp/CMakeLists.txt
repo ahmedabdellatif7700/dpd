@@ -37,12 +37,13 @@ add_library(dpd_core STATIC
     src/tensor_file.cpp
     src/weights.cpp
     src/cpu_model.cpp
+    src/cpu_resampler.cpp
 )
 target_include_directories(dpd_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # the model on the GPU: one fused CUDA kernel per frame
 find_package(CUDAToolkit REQUIRED)
-add_library(dpd_gpu STATIC src/gpu_model.cu)
+add_library(dpd_gpu STATIC src/device_buffer.cu src/gpu_model.cu src/gpu_resampler.cu)
 target_link_libraries(dpd_gpu PUBLIC dpd_core CUDA::cudart)
 
 # the C++ model against the PyTorch reference's golden files
@@ -52,6 +53,10 @@ target_link_libraries(golden_check PRIVATE dpd_core)
 # the CUDA kernel against the golden files and the C++ model, and a first timing
 add_executable(cuda_check tools/cuda_check.cpp)
 target_link_libraries(cuda_check PRIVATE dpd_gpu)
+
+# the resampler (CPU and GPU) against its golden file, and its time per frame
+add_executable(resampler_check tools/resampler_check.cpp)
+target_link_libraries(resampler_check PRIVATE dpd_gpu)
 
 # predistort a drive file with the twin (CPU or GPU): the bridge to the Python checks
 add_executable(dpd_apply tools/dpd_apply.cpp)
@@ -73,6 +78,7 @@ foreach(MODEL transformer_nominal transformer_nominal_memory)
     add_test(NAME cuda_${MODEL}
         COMMAND cuda_check ${MODELS_DIR}/${MODEL}.dpdt ${MODELS_DIR}/golden/${MODEL}.dpdt --reps 20)
 endforeach()
+add_test(NAME resampler COMMAND resampler_check ${MODELS_DIR}/resampler.dpdt ${MODELS_DIR}/golden/resampler.dpdt)
 
 message(STATUS "")
 message(STATUS "arof_dpd configuration")
