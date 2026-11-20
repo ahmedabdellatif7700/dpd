@@ -79,6 +79,10 @@ target_link_libraries(dpd_stage_lib PUBLIC dpd_gpu arof_pipe)
 add_executable(dpd_stage tools/dpd_stage_main.cpp)
 target_link_libraries(dpd_stage PRIVATE dpd_stage_lib)
 
+# records a tap's frames to a file (the PA's output and the dpd stage's own, for ILA)
+add_executable(tap_recorder tools/tap_recorder.cpp)
+target_link_libraries(tap_recorder PRIVATE arof_pipe)
+
 # the C++ model against the PyTorch reference's golden files
 add_executable(golden_check tools/golden_check.cpp)
 target_link_libraries(golden_check PRIVATE dpd_core)

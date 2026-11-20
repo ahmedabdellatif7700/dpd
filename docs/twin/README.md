@@ -25,6 +25,7 @@ The weights files are named after the test PA they were trained on, not after a 
 | `include/dpd/dpd_chain.h` | `DpdChain`: 50 → 8, the model, 8 → 50, over the shared interface (CPU or GPU) |
 | `include/dpd/dpd_stage.h`, `src/dpd_stage.cpp`, `tools/dpd_stage_main.cpp` | the `dpd` stage on the stage library: bypass and dpd modes, κ, the stream; the program `dpd_stage` (docs/testbed/jetson/STAGE.md) |
 | `arof/` | the Pi's stage library, copied verbatim (frame v2, `StageRunner`, `run_filter`, the tap, the timing log) with its test; source commit and checksums in `arof/README.md` |
+| `tools/tap_recorder.cpp` | records a tap's frames to a file (the PA's output and the stage's own: the ILA data) |
 | `tools/model_check.h` | the check both tools share: a model against a golden file |
 | `tools/golden_check.cpp` | `CpuModel` against a golden file, and its speed on one core |
 | `tools/cuda_check.cpp` | `GpuModel` against a golden file and against `CpuModel`, and the kernel's speed |

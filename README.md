@@ -60,7 +60,7 @@ Details: [docs/howto/jetson.md](docs/howto/jetson.md).
 | 1 | Reference transformer DPD in PyTorch; ILA on a test PA; NMSE and EVM with and without the DPD | `dpd/`, `tests/`, `scripts/step1_check.py`, `results/step1.txt` | done |
 | — | Container base: the stage's image (CUDA 13.2, sm_87) and the C++ build | `docker/`, `cpp/` | done |
 | 2 | The transformer as hand-written CUDA kernels on the Jetson's GPU (float32): checked against the reference; throughput at the BASEBAND frame size | `dpd/export.py`, `cpp/` | done (branch `cuda-kernels`, to merge after review) |
-| 3 | The `dpd` stage: frame v2 and the stage contract (a copy of the Pi's stage library), `bypass` and `dpd` modes, the PA tap; tested with a Python feeder and sink; the hookup to the Pi proposed | `dpd/resample.py`, `dpd/stream.py`, `cpp/`, `docker/`, `tests/` | in progress (branch `dpd-stage`): the resampler, the stage library and the stage done |
+| 3 | The `dpd` stage: frame v2 and the stage contract (a copy of the Pi's stage library), `bypass` and `dpd` modes, the PA tap; tested with a Python feeder and sink; the hookup to the Pi proposed | `dpd/resample.py`, `dpd/stream.py`, `cpp/`, `docker/`, `tests/` | in progress (branch `dpd-stage`): the resampler, the stage library, the stage, the hookup proposed |
 
 ## Decisions for the stage (2026-11-20)
 
@@ -210,6 +210,20 @@ co_optics's, the BASEBAND within 9.9e-7 (CUDA) and 1.2e-6 (CPU) of the reference
 one frame out per frame in with seq, flags and order kept; a wrong pipeline stops it with a message
 naming both stages. The compose service now runs it (port 7000). 40 Python tests and 6 ctest checks
 pass. Details: [STAGE.md](docs/testbed/jetson/STAGE.md).
+
+### Step 3, part 4 — the hookup, proposed (2026-11-20)
+
+[HOOKUP.md](docs/testbed/jetson/HOOKUP.md): the Pi (192.168.91.80) and the Jetson (192.168.91.89) on
+one wired subnet; the Pi's `source` sends to the Jetson's stage on port 7000, which sends to
+`co_optics` on the Pi's port 7002; `dpd_bb` on the Pi is not started. On the Pi, nothing is changed
+from here: a compose override (`patches/on-chip-training/compose.jetson.yaml`, checked with
+`docker compose config`) and the `co_optics` patch (`0001-co_optics-kappa-from-dpd_bb.patch`:
+κ from the stage before it, the block located by `first_sample`; bit for bit as before in bypass;
+checked to apply, not compiled). The ILA data go to the Jetson through taps: the PA's output and the
+stage's own output, recorded by `tap_recorder` (tested: the stage's tap recorded byte for byte).
+Clocks: chrony with the Pi serving the Jetson (the Jetson now follows the public pool with 19 ms root
+distance, too coarse for the latency logs), for the user to set up. The bring-up: bypass through the
+Jetson (the board's bytes unchanged), a recording, training on it, then dpd mode.
 
 ## Provenance
 

@@ -1,0 +1,23 @@
+# The Pi's side of the hookup to the Jetson (dpd repository, docs/testbed/jetson/HOOKUP.md): an
+# override of testbed/rpi/compose.yaml, used next to it; compose.yaml itself is unchanged.
+#
+#   cd ~/on-chip-training/testbed/rpi        (with this file copied here)
+#   docker compose -f compose.yaml -f compose.jetson.yaml up --abort-on-container-exit --exit-code-from streamer
+#
+# The Jetson (orinnano8s, 192.168.91.89) runs the dpd stage in dpd_bb's place: source sends to it,
+# it sends to co_optics here, and the PA's tap goes to its recorder.
+services:
+  source:
+    environment:
+      AROF_OUT: tcp://192.168.91.89:7000      # the dpd stage on the Jetson
+
+  dpd_bb:
+    profiles: [local-dpd]                      # not started: the Jetson takes its place
+
+  co_optics:
+    ports:
+      - "7002:7000"                            # the Jetson's dpd stage connects here
+
+  pa:
+    environment:
+      AROF_TAP: tcp://192.168.91.89:7107       # the PA's output to the Jetson's recorder (tap_pa)

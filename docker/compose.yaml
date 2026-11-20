@@ -5,11 +5,15 @@
 # its own: it could not resume its stream).
 #
 #   make -C docker build      make -C docker check      (make -C docker help)
+#   docker compose -f docker/compose.yaml [--profile tap] up       the stage [and the recorders]
 #   DPD_STAGE_DOCKER=1 python -m pytest tests/test_dpd_stage.py    the stage in the image, with a feeder and a sink
 #
-# The stage (dpd_stage): listens on 7000 as every stage of the Pi does; AROF_OUT_CO_OPTICS points it
-# at co_optics on the Pi (the hookup, docs/testbed/jetson/STAGE.md). The mode and the model come in
-# the CONFIG frame (the settings file's "dpd": {"bb": {...}}).
+# The stage (dpd_stage) listens on 7000, as every stage of the Pi does, and sends to co_optics on the
+# Pi (192.168.91.80, port 7002 published by the Pi's compose.jetson.yaml; AROF_OUT_CO_OPTICS
+# overrides it). The mode and the model come in the CONFIG frame (the settings file's
+# "dpd": {"bb": {...}}). Profile "tap": the two recorders of the ILA data, the PA's output (the Pi's
+# pa stage taps to port 7107) and the drive this stage sent (its own tap), to ../records.
+# The hookup, step by step: docs/testbed/jetson/HOOKUP.md.
 name: arof-dpd
 
 services:
@@ -25,10 +29,11 @@ services:
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
       AROF_STAGE: dpd_bb
-      AROF_IN: tcp://0.0.0.0:7000                     # where the Pi's source sends (its AROF_OUT)
-      AROF_OUT: ${AROF_OUT_CO_OPTICS:-tcp://co_optics:7000}   # co_optics on the Pi (the hookup, step 3)
+      AROF_IN: tcp://0.0.0.0:7000                              # the Pi's source sends here
+      AROF_OUT: ${AROF_OUT_CO_OPTICS:-tcp://192.168.91.80:7002} # co_optics on the Pi
+      AROF_TAP: tcp://tap_dpd:7000                             # used when the settings turn "taps": {"dpd_bb": ...} on
       AROF_LOG_DIR: /logs
-      AROF_CONNECT_TIMEOUT_S: "60"
+      AROF_CONNECT_TIMEOUT_S: "${AROF_CONNECT_TIMEOUT_S:-600}" # the Jetson starts first and waits for the Pi
       AROF_MODELS_DIR: /models
       AROF_DPD_DEVICE: cuda
     ports:
@@ -36,3 +41,24 @@ services:
     volumes:
       - ../results/models:/models:ro    # the weights trained by the Python reference, and the resampler
       - ../logs:/logs
+
+  # the ILA recordings (profile "tap"), frame v2 back to back, read with dpd/frame2.py
+  tap_pa:                               # y: the PA's output, from the Pi's pa stage (its AROF_TAP)
+    image: arof-dpd:local
+    profiles: [tap]
+    restart: "no"
+    command: ["tap_recorder"]
+    environment: {AROF_STAGE: tap_pa, AROF_IN: "tcp://0.0.0.0:7000", AROF_SINK_FILE: /records/pa_tap.bin}
+    ports:
+      - "7107:7000"
+    volumes:
+      - ../records:/records
+
+  tap_dpd:                              # x_d: the drive this stage sent, from its own tap
+    image: arof-dpd:local
+    profiles: [tap]
+    restart: "no"
+    command: ["tap_recorder"]
+    environment: {AROF_STAGE: tap_dpd, AROF_IN: "tcp://0.0.0.0:7000", AROF_SINK_FILE: /records/dpd_tap.bin}
+    volumes:
+      - ../records:/records

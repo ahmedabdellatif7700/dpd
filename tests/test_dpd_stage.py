@@ -45,7 +45,7 @@ def free_port():
         return s.getsockname()[1]
 
 
-def source_frames(mode, dtype=np.complex128, upstream_out="BASEBAND"):
+def source_frames(mode, dtype=np.complex128, upstream_out="BASEBAND", taps=None):
     """what the Pi's source sends (Source::calibration_block, emit): returns the frames"""
     n_sym = BLOCK + TAIL + DATA * CHUNK
     s, d = signals.baseband(n_sym, sps=SPS, seed=11)
@@ -54,6 +54,8 @@ def source_frames(mode, dtype=np.complex128, upstream_out="BASEBAND"):
                 "block": {"first_symbol": 0, "block_symbols": BLOCK, "tail_symbols": TAIL, "guard": 16},
                 "pipeline": [{"stage": "source", "out": upstream_out, "dtype": "c128", "fs": 20e9}],
                 "dpd": {"bb": {"mode": mode, "model": MODEL}}, "log": {"timing": True}}
+    if taps:
+        settings["taps"] = taps
     frames, seq = [F.config(settings, seq=0, capture_time_ns=1000)], 1
 
     def emit(i0, n, flags):
@@ -73,8 +75,9 @@ def source_frames(mode, dtype=np.complex128, upstream_out="BASEBAND"):
     return frames, s
 
 
-def run_stage(frames, tmp_path, device="cuda"):
-    """the stage between the feeder and the sink; returns (frames out, exit code, stderr)"""
+def run_stage(frames, tmp_path, device="cuda", tap=None):
+    """the stage between the feeder and the sink; returns (frames out, exit code, stderr). tap: an
+    endpoint for the stage's AROF_TAP"""
     p_in, p_out = free_port(), free_port()
     sink_sock = socket.socket()
     sink_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -99,6 +102,8 @@ def run_stage(frames, tmp_path, device="cuda"):
     t.start()
     arof = {"AROF_STAGE": "dpd_bb", "AROF_IN": f"tcp://127.0.0.1:{p_in}", "AROF_OUT": f"tcp://127.0.0.1:{p_out}",
             "AROF_DPD_DEVICE": device, "AROF_CONNECT_TIMEOUT_S": "20"}
+    if tap:
+        arof["AROF_TAP"] = tap
     if DOCKER:                                   # the stage in its image, on the host's network
         name = f"dpd_stage_test_{p_in}"
         cmd = ["docker", "run", "--rm", "--name", name, "--runtime", "nvidia", "--network", "host",
@@ -216,3 +221,25 @@ def test_wrong_pipeline_stops_it(tmp_path):
     frames, _ = source_frames("dpd", upstream_out="OPTICAL")
     _, code, err = run_stage(frames[:1], tmp_path)
     assert code == 1 and "consumes BASEBAND" in err and "OPTICAL" in err
+
+
+RECORDER = os.path.join(ROOT, "cpp", "bin", "tap_recorder")
+
+
+@pytest.mark.skipif(not os.path.exists(RECORDER), reason="cpp/bin/tap_recorder not built")
+def test_tap_to_the_recorder(tmp_path):
+    """the stage's own tap (the drive it sent, x_d for ILA), lossless, recorded by tap_recorder: the
+    file holds the frames the stage sent on, BASEBAND, CONFIG and END, byte for byte"""
+    p_tap = free_port()
+    rec_file = tmp_path / "dpd_tap.bin"
+    rec = subprocess.Popen([RECORDER], env=dict(os.environ, AROF_STAGE="tap_dpd", AROF_IN=f"tcp://127.0.0.1:{p_tap}",
+                                                AROF_SINK_FILE=str(rec_file)), stderr=subprocess.PIPE, text=True)
+    frames, _ = source_frames("dpd", taps={"dpd_bb": "lossless"})
+    got, code, err = run_stage(frames, tmp_path, tap=f"tcp://127.0.0.1:{p_tap}")
+    _, rec_err = rec.communicate(timeout=60)
+    assert code == 0, err
+    assert rec.returncode == 0 and "END" in rec_err, rec_err
+    tapped = F.read_frames(rec_file.read_bytes())
+    sent = [f for f in got if f.signal == F.BASEBAND or f.flags & (F.CONFIG | F.END)]
+    assert len(tapped) == len(sent) == len(frames) - (len(frames) - 2) // 2   # all but the REF frames
+    assert all(a.to_bytes() == b.to_bytes() for a, b in zip(tapped, sent))

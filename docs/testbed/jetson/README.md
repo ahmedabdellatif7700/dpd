@@ -123,6 +123,11 @@ images above.
 The three decisions it is built on (κ, the DPD's rate, frame boundaries), with the facts, the
 options and the choice made (2026-11-20): [STAGE.md](STAGE.md).
 
+## The hookup
+
+The stage in the Pi's pipeline: the wiring (Pi 192.168.91.80, Jetson 192.168.91.89), the Pi's
+compose override and patch, the clocks, the bring-up in order: [HOOKUP.md](HOOKUP.md).
+
 ## Running
 
 On the Jetson and from the laptop: [docs/howto/jetson.md](../../howto/jetson.md).
