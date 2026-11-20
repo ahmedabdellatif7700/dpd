@@ -53,6 +53,8 @@ The pipeline the stage plugs into is documented in on-chip-training: `docs/testb
 | the stream (`dpd/stream.py`) | the whole drive's transform | equal to 1e-6 (`tests/test_stream.py`) |
 | `CpuResampler`, `GpuResampler` | the resampler's golden file | within 8.8e-7 (`make -C cpp test`, also in the image) |
 | the stage library (`cpp/arof/`, copied) | the Pi's source; its own test | identical (`diff`, checksums); passes (`make -C cpp test`) |
+| the `dpd` stage, bypass | its input, between a feeder and a sink standing in for the Pi | byte for byte (`tests/test_dpd_stage.py`, on the host and in the image) |
+| the `dpd` stage, dpd mode | the reference offline (model, resampler, stream); κ: co_optics's formula | within 1.2e-6; κ bit for bit |
 | the twin through the test PA | the reference's NMSE and EVM, both models, validation and test | equal to 9e-7 dB / % (`scripts/twin_check.py`) |
 | the `dpd` stage | the stage contract, the reference offline | step 3 |
 

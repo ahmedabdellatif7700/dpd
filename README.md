@@ -60,7 +60,7 @@ Details: [docs/howto/jetson.md](docs/howto/jetson.md).
 | 1 | Reference transformer DPD in PyTorch; ILA on a test PA; NMSE and EVM with and without the DPD | `dpd/`, `tests/`, `scripts/step1_check.py`, `results/step1.txt` | done |
 | — | Container base: the stage's image (CUDA 13.2, sm_87) and the C++ build | `docker/`, `cpp/` | done |
 | 2 | The transformer as hand-written CUDA kernels on the Jetson's GPU (float32): checked against the reference; throughput at the BASEBAND frame size | `dpd/export.py`, `cpp/` | done (branch `cuda-kernels`, to merge after review) |
-| 3 | The `dpd` stage: frame v2 and the stage contract (a copy of the Pi's stage library), `bypass` and `dpd` modes, the PA tap; tested with a Python feeder and sink; the hookup to the Pi proposed | `dpd/resample.py`, `dpd/stream.py`, `cpp/`, `docker/`, `tests/` | in progress (branch `dpd-stage`): the resampler and the stage library done |
+| 3 | The `dpd` stage: frame v2 and the stage contract (a copy of the Pi's stage library), `bypass` and `dpd` modes, the PA tap; tested with a Python feeder and sink; the hookup to the Pi proposed | `dpd/resample.py`, `dpd/stream.py`, `cpp/`, `docker/`, `tests/` | in progress (branch `dpd-stage`): the resampler, the stage library and the stage done |
 
 ## Decisions for the stage (2026-11-20)
 
@@ -198,6 +198,19 @@ difference. Built as the Pi builds it (nlohmann/json from the system or a pinned
 the image); it compiles clean here as C++20 with `-Wpedantic`, and its own test passes on the Jetson
 and in the image. The `dpd` stage is built on it next.
 
+### Step 3, part 3 — the `dpd` stage (2026-11-20)
+
+`cpp/bin/dpd_stage` on the copied stage library: `bypass` forwards every frame untouched; `dpd`
+holds each calibration group, computes κ from its undistorted block with co_optics's formula, writes
+it into its `pipeline` line, and predistorts `s → DPD(κ·s)/κ` (50 → 8, the model, 8 → 50) through a
+250-sample holdback (`FrameStream`, the C++ counterpart of `dpd/stream.py`), the group leaving whole.
+Tested between a Python feeder and sink standing in for the Pi (`tests/test_dpd_stage.py`, frame v2
+in `dpd/frame2.py`), on the host and in the image: bypass byte for byte; in dpd mode κ bit for bit
+co_optics's, the BASEBAND within 9.9e-7 (CUDA) and 1.2e-6 (CPU) of the reference applied offline,
+one frame out per frame in with seq, flags and order kept; a wrong pipeline stops it with a message
+naming both stages. The compose service now runs it (port 7000). 40 Python tests and 6 ctest checks
+pass. Details: [STAGE.md](docs/testbed/jetson/STAGE.md).
+
 ## Provenance
 
 Copied or ported from `on-chip-training`, branch `dpd`:
@@ -209,6 +222,7 @@ Copied or ported from `on-chip-training`, branch `dpd`:
 | `dpd/pa.py` | `matlab/results/pa_operating_point.txt` | the PA input's levels: pilot tone 1.104 a0, data 0.371 a0 RMS |
 | `dpd/signals.py` | `matlab/link/default_tx.m`, `transmit_receive_odsb.m` | 16QAM, RRC roll-off 0.75, span 16; `rcosdesign` and `upfirdn` ported |
 | `dpd/metrics.py` | `matlab/paper_rewrite/validation/main_pa_operating_point.m` | the EVM of the PA's output (gain and constant fitted, in-band) |
+| `dpd/frame2.py` | `testbed/rpi/src/stage/frame2.h`, `testbed/rpi/tests/test_pipeline_e2e.py` (`tap_frames`) | frame version 2: the layout, the header struct |
 | `dpd/models.py`, `dpd/ila.py` | `matlab/dpd/README.md` | the DPD plan: the transformer's shape, ILA, the DPD rate, the seeds |
 | `docker/`, `cpp/` | `docs/testbed/rpi/PIPELINE.md` | the stage contract, the service name `dpd_bb`, `restart: "no"` |
 | `cpp/arof/` | `testbed/rpi/src/stage/`, `src/stream/frame.h`, `tests/test_stage.cpp`, `tests/check.h` (commit `14a72ff`) | the stage library, verbatim |

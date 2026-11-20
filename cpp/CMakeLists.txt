@@ -64,6 +64,7 @@ add_library(dpd_core STATIC
     src/weights.cpp
     src/cpu_model.cpp
     src/cpu_resampler.cpp
+    src/frame_stream.cpp
 )
 target_include_directories(dpd_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
@@ -71,6 +72,12 @@ target_include_directories(dpd_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 find_package(CUDAToolkit REQUIRED)
 add_library(dpd_gpu STATIC src/device_buffer.cu src/gpu_model.cu src/gpu_resampler.cu)
 target_link_libraries(dpd_gpu PUBLIC dpd_core CUDA::cudart)
+
+# the dpd stage: the program of the dpd_bb container, on the stage library
+add_library(dpd_stage_lib STATIC src/dpd_stage.cpp)
+target_link_libraries(dpd_stage_lib PUBLIC dpd_gpu arof_pipe)
+add_executable(dpd_stage tools/dpd_stage_main.cpp)
+target_link_libraries(dpd_stage PRIVATE dpd_stage_lib)
 
 # the C++ model against the PyTorch reference's golden files
 add_executable(golden_check tools/golden_check.cpp)

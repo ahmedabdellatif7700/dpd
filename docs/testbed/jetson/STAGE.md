@@ -131,3 +131,42 @@ and sends those on, keeping the last 250; holds the calibration group once per c
 κ from its undistorted block, writes κ into its `pipeline` line, and flushes the group whole; and
 forwards CONFIG, REF and END. The change on the Pi, one patch to `co_optics`: use the κ of that line
 when it is there, and locate the block by `first_sample`.
+
+## The stage as built
+
+`cpp/bin/dpd_stage` (`cpp/src/dpd_stage.cpp`, on the copied stage library `cpp/arof/`), the command
+of the `dpd_bb` service (`docker/compose.yaml`). Its section of the settings file, carried to it in
+the CONFIG frame as the Pi's source carries `"taps"` and `"log"`:
+
+```json
+"dpd": {"bb": {"mode": "dpd", "model": "transformer_nominal"}}
+```
+
+| | `"mode": "bypass"` (the default) | `"mode": "dpd"` |
+|---|---|---|
+| BASEBAND | forwarded untouched, byte for byte | predistorted: `s → DPD(κ·s)/κ`, DPD = 50 → 8, the model, 8 → 50, through the 250-sample holdback (`FrameStream`, `dpd/stream.py`'s counterpart) |
+| calibration group | passes | held; κ from its block (co_optics's formula, on the undistorted `s`); leaves whole, κ in the stage's `pipeline` line (`"calibration": {"kappa": …}`) |
+| CONFIG | the stage's line `{"stage": "dpd_bb", "in"/"out": "BASEBAND", "mode": "bypass"}` | also `model`, `device`, `dpd_sps` 8, `hold_samples` 250, and the calibration |
+| REF, END | forwarded | forwarded |
+| dtype | as it comes | complex128 or complex64 in, the same out; float32 inside |
+
+Environment: `AROF_STAGE`, `AROF_IN`, `AROF_OUT`, `AROF_TAP`, `AROF_LOG_DIR`,
+`AROF_CONNECT_TIMEOUT_S` as every stage (the library's); `AROF_MODELS_DIR` (default `/models`: the
+weights `<model>.dpdt` and `resampler.dpdt`) and `AROF_DPD_DEVICE` (`cuda`, default, or `cpu`). It
+stops with a message and exit code 1 on: a stage before it that does not produce BASEBAND, a dtype it
+cannot take, a non-contiguous drive, a calibration block of another size than the CONFIG frame's,
+settings not at 50 samples per symbol, a missing model.
+
+**Tested without the Pi** (`tests/test_dpd_stage.py`): a feeder sends what the Pi's source sends (a
+CONFIG frame, the calibration block of 552 symbols in 128-symbol frames with their REF frames, a
+30-symbol tail, 3 data frames, END), a sink records what comes out, the stage runs between them over
+TCP, on the host or in the image (`DPD_STAGE_DOCKER=1`):
+
+| Test | Result |
+|---|---|
+| bypass | every frame byte for byte as it came; the CONFIG frame gains the stage's line, nothing else |
+| dpd, κ | in the stage's line, bit for bit co_optics's formula on the undistorted block (1.2822809823405896) |
+| dpd, BASEBAND | equal to the reference applied offline (PyTorch model, resampler, `dpd/stream.py`): within 9.9e-7 on CUDA, 1.2e-6 on the CPU |
+| dpd, the frames | one out per frame in (20), in order, seq and flags kept; REF and END unchanged; the drive contiguous by `first_sample`; the calibration group leaves whole (its last frame: the 30-symbol tail and the 250 held samples) |
+| a wrong pipeline | exit code 1, `dpd_bb consumes BASEBAND, but the stage before it, source, produces OPTICAL` |
+| the timing log | `dpd_bb.csv`, one line per frame, the library's columns |

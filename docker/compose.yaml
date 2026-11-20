@@ -5,9 +5,11 @@
 # its own: it could not resume its stream).
 #
 #   make -C docker build      make -C docker check      (make -C docker help)
+#   DPD_STAGE_DOCKER=1 python -m pytest tests/test_dpd_stage.py    the stage in the image, with a feeder and a sink
 #
-# Step 3 fills in the stage: its command, AROF_IN/AROF_OUT/AROF_TAP towards the Pi, the ports and
-# the network. The endpoint values below are placeholders until then.
+# The stage (dpd_stage): listens on 7000 as every stage of the Pi does; AROF_OUT_CO_OPTICS points it
+# at co_optics on the Pi (the hookup, docs/testbed/jetson/STAGE.md). The mode and the model come in
+# the CONFIG frame (the settings file's "dpd": {"bb": {...}}).
 name: arof-dpd
 
 services:
@@ -18,14 +20,19 @@ services:
     image: arof-dpd:local
     runtime: nvidia
     restart: "no"
+    command: ["dpd_stage"]
     environment:
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
       AROF_STAGE: dpd_bb
-      AROF_IN: tcp://0.0.0.0:7002       # placeholder: where source sends (step 3)
-      AROF_OUT: tcp://co_optics:7003    # placeholder: co_optics on the Pi (step 3)
+      AROF_IN: tcp://0.0.0.0:7000                     # where the Pi's source sends (its AROF_OUT)
+      AROF_OUT: ${AROF_OUT_CO_OPTICS:-tcp://co_optics:7000}   # co_optics on the Pi (the hookup, step 3)
       AROF_LOG_DIR: /logs
       AROF_CONNECT_TIMEOUT_S: "60"
+      AROF_MODELS_DIR: /models
+      AROF_DPD_DEVICE: cuda
+    ports:
+      - "7000:7000"
     volumes:
-      - ../results/models:/models:ro    # the weights trained by the Python reference
+      - ../results/models:/models:ro    # the weights trained by the Python reference, and the resampler
       - ../logs:/logs

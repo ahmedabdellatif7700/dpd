@@ -44,6 +44,12 @@ docker compose -f docker/compose.yaml run --rm dpd_bb \
     golden_check /models/transformer_nominal.dpdt /models/golden/transformer_nominal.dpdt
 ```
 
+The stage itself, in the image, between a feeder and a sink standing in for the Pi:
+
+```bash
+DPD_STAGE_DOCKER=1 python -m pytest -q tests/test_dpd_stage.py
+```
+
 `make -C docker check` should print the CUDA runtime and driver 13.2, the device `Orin` (8.7) and
 `kernel on 6400 samples, max error 0: OK`. The container runs with the NVIDIA runtime
 (`runtime: nvidia` in `docker/compose.yaml`); without it the GPU is not visible.

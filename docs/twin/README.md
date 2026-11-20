@@ -21,6 +21,9 @@ The weights files are named after the test PA they were trained on, not after a 
 | `include/dpd/resampler.h`, `cpu_resampler.h`, `gpu_resampler.h`; `src/cpu_resampler.cpp`, `src/gpu_resampler.cu` | the resampler 50 ↔ 8 (`ResamplerFilter`, `load_resampler`; `CpuResampler` and `GpuResampler`, one interface) |
 | `include/dpd/device_buffer.h`, `src/device_buffer.cu`, `src/cuda_util.h` | GPU memory owned by a `unique_ptr` (`DeviceBuffer`); `check` and `device_alloc` for the CUDA sources |
 | `tools/resampler_check.cpp` | the resampler, CPU and GPU, against its golden file, and its time per frame |
+| `include/dpd/frame_stream.h`, `src/frame_stream.cpp` | `FrameStream`: the 250-sample holdback (decision 3b), `dpd/stream.py` line for line |
+| `include/dpd/dpd_chain.h` | `DpdChain`: 50 → 8, the model, 8 → 50, over the shared interface (CPU or GPU) |
+| `include/dpd/dpd_stage.h`, `src/dpd_stage.cpp`, `tools/dpd_stage_main.cpp` | the `dpd` stage on the stage library: bypass and dpd modes, κ, the stream; the program `dpd_stage` (docs/testbed/jetson/STAGE.md) |
 | `arof/` | the Pi's stage library, copied verbatim (frame v2, `StageRunner`, `run_filter`, the tap, the timing log) with its test; source commit and checksums in `arof/README.md` |
 | `tools/model_check.h` | the check both tools share: a model against a golden file |
 | `tools/golden_check.cpp` | `CpuModel` against a golden file, and its speed on one core |
@@ -143,6 +146,14 @@ EVM by at most 9e-7 (dB, percentage points), on the GPU and the CPU alike (`resu
 tolerances 1e-5 and 0.01). The twin linearizes the PA exactly as the reference does.
 `tests/test_twin.py` repeats the comparison on a short drive within `pytest`, and is skipped where
 the C++ tools are not built.
+
+## The dpd stage
+
+`dpd_stage` runs the chain above as the pipeline's `dpd_bb`: it consumes BASEBAND at 50 samples per
+symbol, predistorts `κ·s` through the resampler and the model with a 250-sample holdback, and
+forwards everything else, on the Pi's stage library. Its design, settings and tests (bypass byte for
+byte; dpd within 1e-6 of the reference offline, κ bit for bit co_optics's; on the host and in the
+image): [docs/testbed/jetson/STAGE.md](../testbed/jetson/STAGE.md).
 
 ## Speed
 

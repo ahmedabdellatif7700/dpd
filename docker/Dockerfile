@@ -66,5 +66,5 @@ RUN for dir in \
 COPY --from=build /opt/arof-dpd/ /opt/arof-dpd/
 ENV PATH=/opt/arof-dpd:${PATH}
 
-# Step 3: the dpd stage becomes the command; gpu_check stays as the image's self-test.
-CMD ["gpu_check"]
+# the dpd stage (compose.yaml runs it); gpu_check is the image's self-test
+CMD ["dpd_stage"]
