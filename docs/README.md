@@ -49,7 +49,7 @@ The pipeline the stage plugs into is documented in on-chip-training: `docs/testb
 | the image | the CPU | a kernel on one 6400-sample frame, error 0 (`gpu_check`) |
 | `CpuModel`, C++ on the CPU (`cpp/`) | the reference's golden files: output and every layer of 8 probes | within 1.9e-6 (`make -C cpp test`, also in the image) |
 | `GpuModel`, the fused CUDA kernel | the golden files, and `CpuModel` | within 1.7e-6, and 7.6e-7 of `CpuModel` (`make -C cpp test`, also in the image) |
-| the twin through the test PA | the reference's NMSE and EVM | step 2, part 4 |
+| the twin through the test PA | the reference's NMSE and EVM, both models, validation and test | equal to 9e-7 dB / % (`scripts/twin_check.py`) |
 | the `dpd` stage | the stage contract, the reference offline | step 3 |
 
 ## Not done yet

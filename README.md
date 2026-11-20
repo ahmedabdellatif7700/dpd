@@ -45,7 +45,7 @@ under [Provenance](#provenance).
 
 ```bash
 conda activate machine-learning
-python -m pytest -q                                  # unit tests, ~80 s
+python -m pytest -q                                  # unit tests, ~100 s
 python scripts/step1_check.py --device cuda          # ILA on the test PA, ~6 min (run in tmux)
 make -C cpp test                                     # the C++ model against the reference (golden files)
 make -C docker check                                 # build the image, GPU self-test in the container
@@ -59,7 +59,7 @@ Details: [docs/howto/jetson.md](docs/howto/jetson.md).
 |---|---|---|---|
 | 1 | Reference transformer DPD in PyTorch; ILA on a test PA; NMSE and EVM with and without the DPD | `dpd/`, `tests/`, `scripts/step1_check.py`, `results/step1.txt` | done |
 | — | Container base: the stage's image (CUDA 13.2, sm_87) and the C++ build | `docker/`, `cpp/` | done |
-| 2 | The transformer as hand-written CUDA kernels on the Jetson's GPU (float32): checked against the reference; throughput at the BASEBAND frame size | `dpd/export.py`, `cpp/` | in progress (branch `cuda-kernels`): parts 1-3 of 5 done |
+| 2 | The transformer as hand-written CUDA kernels on the Jetson's GPU (float32): checked against the reference; throughput at the BASEBAND frame size | `dpd/export.py`, `cpp/` | in progress (branch `cuda-kernels`): parts 1-4 of 5 done |
 | 3 | The `dpd` stage: frame v2 and the stage contract (a copy of the Pi's stage library), `bypass` and `dpd` modes, the PA tap; tested with a Python feeder and sink; the hookup to the Pi proposed | `cpp/`, `docker/`, `tests/` | |
 
 ## Open decisions
@@ -151,7 +151,16 @@ frame, 384 000 samples/s**). 2.73 times the first version; the 250 000 samples/s
 symbols/s need at 50 samples per symbol are met with 54 % to spare. Details:
 [docs/twin/](docs/twin/README.md).
 
-Plan of the rest of step 2: (4) the check against the
+### Step 2, part 4 — the twin through the test PA (2026-11-20)
+
+`scripts/twin_check.py`: the step 1 validation and test drives predistorted by the reference and by
+the twin (`cpp/bin/dpd_apply`, GPU and CPU), then through the test PA. The twin's outputs are within
+8.8e-7 of the reference's, and its NMSE and EVM equal the reference's to 9e-7 (dB, %), for both models:
+nominal PA -48.446 dB and 0.205 % on the test sequence, as the reference. The step 1 drive and
+measures moved into `dpd/evaluate.py`, shared by both checks (step 1's numbers unchanged). 27 unit
+tests pass, among them the twin on a short drive. Details: [docs/twin/](docs/twin/README.md).
+
+Plan of the rest of step 2: (4, done) the check against the
 reference, and the PA-output NMSE and EVM with the twin; (5) the throughput and latency per frame.
 
 ## Provenance

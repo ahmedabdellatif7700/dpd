@@ -8,12 +8,14 @@
 ```bash
 git pull
 conda activate machine-learning        # ~/miniconda3; created from environment.yml
-python -m pytest -q                     # the unit tests, ~80 s (CPU, and CUDA where present)
+python -m pytest -q                     # the unit tests, ~100 s (CPU, and CUDA and the twin where built)
 tmux new -s step1 'python scripts/step1_check.py --device cuda'
                                         # ILA on the test PA, ~6 min on the GPU:
                                         # results/step1.txt, step1.json, results/models/*.pt
 python scripts/export_model.py          # the weights and golden files for the twin:
                                         # results/models/*.dpdt, results/models/golden/*.dpdt
+python scripts/twin_check.py            # the twin (cpp/bin/dpd_apply, after make -C cpp) through the
+                                        # test PA against the reference: results/step2_twin.txt
 ```
 
 `step1_check.py` takes `--device cpu|cuda`, `--passes`, `--epochs`, `--n-train`, `--n-eval`. A new

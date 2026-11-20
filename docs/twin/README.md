@@ -21,6 +21,7 @@ The weights files are named after the test PA they were trained on, not after a 
 | `tools/model_check.h` | the check both tools share: a model against a golden file |
 | `tools/golden_check.cpp` | `CpuModel` against a golden file, and its speed on one core |
 | `tools/cuda_check.cpp` | `GpuModel` against a golden file and against `CpuModel`, and the kernel's speed |
+| `tools/dpd_apply.cpp` | predistorts a drive file on the GPU or the CPU: the bridge to the Python checks |
 | `tools/gpu_check.cu` | the image's GPU self-test |
 | `CMakeLists.txt`, `Makefile` | the libraries `dpd_core` (CPU) and `dpd_gpu` (CUDA), the tools, the ctest checks |
 
@@ -107,6 +108,27 @@ orders of summation: a few units in the last place of float32 (1.2e-7), and they
 through the layers. The same numbers come out of the image (`arof-dpd:local`, with
 `results/models/` mounted at `/models`). A mismatched model and golden file, a truncated file and a
 file without weights are each rejected.
+
+## Through the test PA
+
+`scripts/twin_check.py` closes the loop: the drive of step 1 (validation seed 4242 and test seed
+2017, 2048 symbols, 16 505 samples each) is predistorted by the reference (PyTorch) and by the twin
+(`dpd_apply`, on the GPU and on the CPU), and each goes through the test PA the model was trained
+for. Numpy writes the drive to a DPDT file, `dpd_apply` predistorts it, numpy reads the output and
+measures it (`dpd/evaluate.py`, the same code as step 1), so there are no bindings to debug.
+
+| Model | Sequence | NMSE, dB: none → PyTorch → twin | EVM symbols, %: none → PyTorch → twin |
+|---|---|---|---|
+| `transformer_nominal` | validation | -14.843 → -48.831 → -48.831 | 17.277 → 0.198 → 0.198 |
+| | test | -14.860 → -48.446 → -48.446 | 17.294 → 0.205 → 0.205 |
+| `transformer_nominal_memory` | validation | -10.606 → -16.117 → -16.117 | 27.386 → 7.868 → 7.868 |
+| | test | -10.644 → -16.192 → -16.192 | 27.356 → 7.958 → 7.958 |
+
+The twin's outputs differ from the reference's by at most 8.8e-7 (over the RMS), and its NMSE and
+EVM by at most 9e-7 (dB, percentage points), on the GPU and the CPU alike (`results/step2_twin.txt`;
+tolerances 1e-5 and 0.01). The twin linearizes the PA exactly as the reference does.
+`tests/test_twin.py` repeats the comparison on a short drive within `pytest`, and is skipped where
+the C++ tools are not built.
 
 ## Speed
 

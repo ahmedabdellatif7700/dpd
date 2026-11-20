@@ -19,24 +19,11 @@ import numpy as np
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from dpd import metrics, pa, signals                     # noqa: E402
+from dpd import pa, signals                               # noqa: E402
+from dpd.evaluate import FS, drive, measures              # noqa: E402
+from dpd.evaluate import link as make_link                # noqa: E402
 from dpd.ila import ila                                   # noqa: E402
 from dpd.models import DPD, TransformerDPD                # noqa: E402
-
-FS = signals.RS * signals.N_DPD
-
-
-def drive(n_sym, seed):
-    s, d = signals.baseband(n_sym, seed=seed)
-    return s * pa.DATA_RMS_A0 / np.sqrt(np.mean(np.abs(s) ** 2)), d
-
-
-def measures(link, x, d, dpd=None):
-    xd = x if dpd is None else dpd.predistort(x)
-    y = link(xd)
-    return {"nmse_db": metrics.nmse_db(y, x), "evm_waveform_pct": 100 * metrics.evm_waveform(y, x, FS),
-            "evm_symbols_pct": 100 * metrics.evm_symbols(y, d),
-            "papr_in_db": float(10 * np.log10(np.max(np.abs(xd + pa.TONE_A0) ** 2) / np.mean(np.abs(xd + pa.TONE_A0) ** 2)))}
 
 
 def main():
@@ -65,8 +52,7 @@ def main():
                      "passes": a.passes, "epochs": a.epochs, "batch": 512, "lr": 2e-3},
            "cases": {}}
     for name, p in cases.items():
-        def link(x, p=p):
-            return pa.pa_chain(x, p, fs=FS)
+        link = make_link(p)
         dpd = DPD(TransformerDPD(), a.device)
         rep["model"] = json.loads(dpd.describe())
         print(f"== {name}: {dpd.describe()}", flush=True)
@@ -76,8 +62,8 @@ def main():
         dpd.save(os.path.join(a.out, "models", f"transformer_{name}.pt"))
         r = {"G": [G.real, G.imag], "train_time_s": t_train,
              "pass_post_inverse_nmse_db": [h["nmse_db"][-1] for h in hist],
-             "validation": {"no_dpd": measures(link, x_va, d_va), "dpd": measures(link, x_va, d_va, dpd)},
-             "test": {"no_dpd": measures(link, x_te, d_te), "dpd": measures(link, x_te, d_te, dpd)}}
+             "validation": {"no_dpd": measures(link, x_va, d_va), "dpd": measures(link, x_va, d_va, dpd.predistort(x_va))},
+             "test": {"no_dpd": measures(link, x_te, d_te), "dpd": measures(link, x_te, d_te, dpd.predistort(x_te))}}
         rep["cases"][name] = r
         print(json.dumps(r["test"], indent=1), flush=True)
 

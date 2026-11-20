@@ -23,6 +23,9 @@ struct Tensor {
 // trailing bytes. The tensors come in the file's order.
 std::vector<Tensor> read_tensor_file(const std::string& path);
 
+// Writes tensors to a DPDT file (the format dpd/export.py reads); throws if it cannot.
+void write_tensor_file(const std::string& path, const std::vector<Tensor>& tensors);
+
 // The tensor called name; throws if it is missing.
 const Tensor& find(const std::vector<Tensor>& tensors, std::string_view name);
 

@@ -1,0 +1,138 @@
+{
+ "n_sym": 2048,
+ "tol": 1e-05,
+ "metric_tol": 0.01,
+ "cases": {
+  "transformer_nominal": {
+   "validation": {
+    "samples": 16505,
+    "no_dpd": {
+     "nmse_db": -14.843008143972764,
+     "evm_waveform_pct": 17.57245825204789,
+     "evm_symbols_pct": 17.277464736869362,
+     "papr_in_db": 3.202176122463076
+    },
+    "reference": {
+     "nmse_db": -48.83124297521077,
+     "evm_waveform_pct": 0.21329737631417559,
+     "evm_symbols_pct": 0.1981345720551139,
+     "papr_in_db": 5.387950193727695
+    },
+    "twin_cuda": {
+     "nmse_db": -48.831242060273254,
+     "evm_waveform_pct": 0.21329739366052103,
+     "evm_symbols_pct": 0.19813459615784088,
+     "papr_in_db": 5.387950121538396,
+     "output_error": 5.708819956167595e-07,
+     "metric_diff": 9.149375159722695e-07
+    },
+    "twin_cpu": {
+     "nmse_db": -48.831242663249476,
+     "evm_waveform_pct": 0.21329737755597747,
+     "evm_symbols_pct": 0.19813455578777026,
+     "papr_in_db": 5.387949229119839,
+     "output_error": 7.27734608902162e-07,
+     "metric_diff": 3.1196129413046947e-07
+    }
+   },
+   "test": {
+    "samples": 16505,
+    "no_dpd": {
+     "nmse_db": -14.859742582376276,
+     "evm_waveform_pct": 17.560326853309636,
+     "evm_symbols_pct": 17.294462653655856,
+     "papr_in_db": 3.282347959480947
+    },
+    "reference": {
+     "nmse_db": -48.4463715127598,
+     "evm_waveform_pct": 0.222528844073787,
+     "evm_symbols_pct": 0.20534678054188243,
+     "papr_in_db": 5.387558401910109
+    },
+    "twin_cuda": {
+     "nmse_db": -48.446371612181586,
+     "evm_waveform_pct": 0.22252884670948903,
+     "evm_symbols_pct": 0.20534677273756,
+     "papr_in_db": 5.387558847403401,
+     "output_error": 5.722516154946819e-07,
+     "metric_diff": 9.94217899119576e-08
+    },
+    "twin_cpu": {
+     "nmse_db": -48.44637232404685,
+     "evm_waveform_pct": 0.22252883645882557,
+     "evm_symbols_pct": 0.20534675713148545,
+     "papr_in_db": 5.387559304002001,
+     "output_error": 7.153145193683524e-07,
+     "metric_diff": 8.112870517607007e-07
+    }
+   }
+  },
+  "transformer_nominal_memory": {
+   "validation": {
+    "samples": 16505,
+    "no_dpd": {
+     "nmse_db": -10.605699847692252,
+     "evm_waveform_pct": 28.707202818999413,
+     "evm_symbols_pct": 27.385858879147555,
+     "papr_in_db": 3.202176122463076
+    },
+    "reference": {
+     "nmse_db": -16.11712646414749,
+     "evm_waveform_pct": 9.862231607440485,
+     "evm_symbols_pct": 7.867800650767336,
+     "papr_in_db": 4.633255053607566
+    },
+    "twin_cuda": {
+     "nmse_db": -16.11712642349988,
+     "evm_waveform_pct": 9.86223167581795,
+     "evm_symbols_pct": 7.867800609857009,
+     "papr_in_db": 4.633255052380807,
+     "output_error": 7.848543118212737e-07,
+     "metric_diff": 6.837746546750623e-08
+    },
+    "twin_cpu": {
+     "nmse_db": -16.117126392370434,
+     "evm_waveform_pct": 9.862231883735383,
+     "evm_symbols_pct": 7.867800865362998,
+     "papr_in_db": 4.6332555138773825,
+     "output_error": 8.076084241220753e-07,
+     "metric_diff": 2.7629489807168284e-07
+    }
+   },
+   "test": {
+    "samples": 16505,
+    "no_dpd": {
+     "nmse_db": -10.643697373500574,
+     "evm_waveform_pct": 28.612012705215662,
+     "evm_symbols_pct": 27.35599627481567,
+     "papr_in_db": 3.282347959480947
+    },
+    "reference": {
+     "nmse_db": -16.192420468219314,
+     "evm_waveform_pct": 9.887113614806061,
+     "evm_symbols_pct": 7.958035425526842,
+     "papr_in_db": 4.694895435039507
+    },
+    "twin_cuda": {
+     "nmse_db": -16.192420322330562,
+     "evm_waveform_pct": 9.887113499104583,
+     "evm_symbols_pct": 7.958035377257129,
+     "papr_in_db": 4.69489497110759,
+     "output_error": 8.826728403060209e-07,
+     "metric_diff": 1.4588875174581517e-07
+    },
+    "twin_cpu": {
+     "nmse_db": -16.192420360591253,
+     "evm_waveform_pct": 9.887113709383936,
+     "evm_symbols_pct": 7.958035578034529,
+     "papr_in_db": 4.6948954201241,
+     "output_error": 7.498554435567754e-07,
+     "metric_diff": 1.525076873676312e-07
+    }
+   }
+  }
+ },
+ "ok": true,
+ "max_output_error": 8.826728403060209e-07,
+ "max_metric_diff": 9.149375159722695e-07
+}

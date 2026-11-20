@@ -78,6 +78,29 @@ std::vector<Tensor> read_tensor_file(const std::string& path) {
     return out;
 }
 
+void write_tensor_file(const std::string& path, const std::vector<Tensor>& tensors) {
+    std::ofstream f(path, std::ios::binary);
+    if (!f) throw std::runtime_error(path + ": cannot write");
+    auto put = [&](const void* p, std::size_t n) { f.write(static_cast<const char*>(p), static_cast<std::streamsize>(n)); };
+    const auto count = static_cast<uint32_t>(tensors.size());
+    put(kMagic, 4);
+    put(&kVersion, 4);
+    put(&count, 4);
+    for (const auto& t : tensors) {
+        std::size_t n = 1;
+        for (auto d : t.dims) n *= d;
+        if (n != t.data.size()) throw std::runtime_error("tensor '" + t.name + "': dims do not match its data");
+        const auto name_len = static_cast<uint16_t>(t.name.size());
+        const auto ndim = static_cast<uint8_t>(t.dims.size());
+        put(&name_len, 2);
+        put(t.name.data(), t.name.size());
+        put(&ndim, 1);
+        put(t.dims.data(), 4 * t.dims.size());
+        put(t.data.data(), 4 * t.data.size());
+    }
+    if (!f) throw std::runtime_error(path + ": write failed");
+}
+
 const Tensor& find(const std::vector<Tensor>& tensors, std::string_view name) {
     for (const auto& t : tensors)
         if (t.name == name) return t;

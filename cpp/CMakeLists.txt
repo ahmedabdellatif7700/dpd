@@ -53,6 +53,10 @@ target_link_libraries(golden_check PRIVATE dpd_core)
 add_executable(cuda_check tools/cuda_check.cpp)
 target_link_libraries(cuda_check PRIVATE dpd_gpu)
 
+# predistort a drive file with the twin (CPU or GPU): the bridge to the Python checks
+add_executable(dpd_apply tools/dpd_apply.cpp)
+target_link_libraries(dpd_apply PRIVATE dpd_gpu)
+
 # the image's self-test: the GPU from inside the container
 add_executable(gpu_check tools/gpu_check.cu)
 
