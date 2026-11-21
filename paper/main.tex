@@ -1,0 +1,91 @@
+% Build: make (latexmk in the TeX Live container; README.md)
+
+\documentclass[journal]{IEEEtran}
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+
+% a result not measured yet (to be removed before submission)
+\newcommand{\tbd}[1]{{\color{red!75!black}[#1]}}
+
+\begin{document}
+
+\title{Real-Time Transformer Digital Predistortion on an Embedded GPU for a 28-GHz Analog
+Radio-over-Fiber Fronthaul}
+
+\author{Ahmed~Abdellatif}
+
+\markboth{Journal of Lightwave Technology,~Vol.~XX, No.~X, Month~2027}%
+{Abdellatif: Real-Time Transformer DPD on an Embedded GPU for a 28-GHz A-RoF Fronthaul}
+
+\maketitle
+
+\begin{abstract}
+\tbd{To be written last, from the results.}
+\end{abstract}
+
+\begin{IEEEkeywords}
+Analog radio-over-fiber, millimeter wave, digital predistortion, transformer, indirect learning,
+GPU, real time, fronthaul.
+\end{IEEEkeywords}
+
+\section{Introduction}\label{sec:intro}
+
+\IEEEPARstart{A}{nalog} radio-over-fiber (A-RoF) carries the radio waveform itself on an optical
+carrier from the central office (CO) to a remote antenna unit (RAU). The RAU stays simple and the
+signal processing stays at the CO, which makes A-RoF a candidate fronthaul for the
+\SI{28}{GHz} band of 5G. Because the waveform stays
+analog, the distortions of the components accumulate along the link: the modulators at the CO, the
+photodiode, and above all the millimeter-wave (mmW) power amplifier (PA) at the RAU, which
+compresses the large amplitudes of a wideband signal and adds memory. On a \SI{28}{GHz} wideband
+A-RoF fronthaul, compensating this nonlinearity with a neural network at the receiver improves on a
+Volterra equalizer, at a higher complexity~\cite{song2024}; but a receiver-side compensator has to
+run in every user equipment, after the wireless hop has added its noise to the distortion.
+
+Digital predistortion (DPD) compensates the same distortion once, at the CO, before it occurs: the
+baseband drive is distorted with the inverse of the link, so that the PA's output is linear.
+Indirect learning makes this practical: a postdistorter is trained to map the link's output back to
+its input and is then copied in front of the link. With memory and generalized memory polynomials
+identified in this way, DPD has linearized A-RoF links~\cite{hadi2019}. Polynomial models, however,
+grow quickly with the order of the nonlinearity and the length of the memory, and neural networks
+model strong nonlinearities with memory more compactly, at the cost of more computation per sample,
+which a DPD must perform at the signal's rate. A GPU can carry that cost: a pruned feed-forward DPD
+network has run in real time on a GPU at about \SI{1}{GSa/s}~\cite{li2025}. A GPU is also what a CO
+or an edge node is likely to have, and an embedded GPU fits beside the fronthaul equipment.
+
+This paper presents a transformer DPD for a \SI{28}{GHz} A-RoF fronthaul, running in real time on
+an embedded GPU inside a real-time testbed of the link. The link uses a single laser: an optical
+double-sideband signal generates the mmW carrier on the photodiode, and 16QAM at
+\SI{400}{MBd} is modulated at baseband onto the upper sideband only, over \SI{15}{km} of
+standard fiber, to a PA at the RAU. A Raspberry Pi emulates the link sample by sample as a pipeline
+of stages; the DPD replaces the pass-through stage before the modulators and runs on a Jetson Orin
+Nano. The transformer, a window of 32 samples encoded by two attention layers with
+\num{18338} parameters, is trained offline by indirect learning on recordings of the live
+testbed, and runs as hand-written CUDA kernels in a C++ stage of the pipeline.
+
+The contributions of this paper are:
+\begin{enumerate}
+\item \emph{A transformer DPD for a mmW A-RoF link}, trained by indirect learning on the link's
+own recordings, against a memory-polynomial DPD and no DPD on the same link
+(Sections~\tbd{}): \tbd{the EVM and BER at the receiver, and the PA's output}.
+\item \emph{Its real-time implementation on an embedded GPU}: the model as hand-written CUDA
+kernels, checked against the PyTorch reference, with \tbd{its throughput and latency per frame}
+(Section~\tbd{}).
+\item \emph{A real-time testbed} in which the DPD runs as one stage of the emulated link, with the
+link's other stages on a second machine and the two clocks synchronized, so that the DPD is trained
+and evaluated on the stream it predistorts (Section~\tbd{}).
+\end{enumerate}
+
+Section~\tbd{} describes the link and the testbed, Section~\tbd{} the DPD and its training,
+Section~\tbd{} its implementation on the GPU, Section~\tbd{} the results, and
+Section~\tbd{} concludes.
+
+\bibliographystyle{IEEEtran}
+\bibliography{refs}
+
+\end{document}
