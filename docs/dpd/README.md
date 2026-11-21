@@ -1,6 +1,7 @@
 # The reference DPD
 
-`dpd/`, a Python package (PyTorch). It defines the model, trains it, and gives the outputs the
+`dpd/`, a Python package (PyTorch); `dpd/testing/` holds what only the tests and the checks use
+(the test PA, the test signals, the measures). It defines the model, trains it, and gives the outputs the
 C++/CUDA twin must reproduce; on the PC, MATLAB calls it. numpy at the boundary: complex arrays in
 and out, float32 inside, on the CPU or CUDA. Every equation and constant it computes:
 [METHODOLOGY](METHODOLOGY.md).
@@ -9,14 +10,14 @@ and out, float32 inside, on the CPU or CUDA. Every equation and constant it comp
 |---|---|
 | `models.py` | `TransformerDPD`, the network; `DPD`, its numpy wrapper: `predistort(x)`, `predistort_reim(re, im)` (MATLAB's form: two float64 vectors), `fit(u, t)`, `save` / `load`, `describe` |
 | `ila.py` | indirect learning: `target_gain`, `ila_step` (one recording), `ila` (passes against a callable link) |
-| `pa.py` | the test PA: `rf_amp.m` ported line for line, with the nominal link's parameters; `pa_chain` adds and removes the pilot tone. A test fixture, not a link stage |
-| `signals.py` | 16QAM through the RRC filter, and the matched filter |
-| `metrics.py` | NMSE, the EVM of the waveform (in-band), the EVM of the symbols |
+| `testing/pa.py` | the test PA: `rf_amp.m` ported line for line, with the nominal link's parameters; `pa_chain` adds and removes the pilot tone. A test fixture, not a link stage |
+| `testing/signals.py` | 16QAM through the RRC filter, and the matched filter |
+| `testing/metrics.py` | NMSE, the EVM of the waveform (in-band), the EVM of the symbols |
 | `export.py` | the weights and the golden files for the C++/CUDA twin ([FORMAT](FORMAT.md)) |
 | `resample.py` | the resampler between the pipeline's 50 samples per symbol and the model's 8 (one Kaiser low-pass at 80 GS/s, 503 taps, 80 dB) |
 | `stream.py` | `FrameStream`: the stage's frame-by-frame processing with a 250-sample holdback (decision 3b), the specification of the C++ stage |
 | `frame2.py` | frame version 2 in Python (the stage's feeder and sink, the PA tap's recordings): on-chip-training's `frame2.h` layout and `tap_frames()` |
-| `evaluate.py` | the test drive and the measures at the PA's output, shared by the checks of the reference and of the twin |
+| `testing/evaluate.py` | the test drive and the measures at the PA's output, shared by the checks of the reference and of the twin |
 
 ## The model
 
@@ -70,7 +71,7 @@ operating point.
 
 ## Results
 
-Step 1, `scripts/step1_check.py` on the GPU: 16QAM at 8 samples per symbol, 4096 training symbols
+Step 1, `checks/step1_check.py` on the GPU: 16QAM at 8 samples per symbol, 4096 training symbols
 (seed 1), 2048 validation (seed 4242) and test (seed 2017) symbols; 3 ILA passes of 30 epochs,
 ~170 s. Test sequence (`results/step1.txt`; validation agrees to 0.1):
 

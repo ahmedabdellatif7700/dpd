@@ -26,12 +26,16 @@ reference ([dpd/](docs/dpd/README.md)) and every equation it computes
 ## Layout
 
 ```
-dpd/                the reference DPD (Python package)
-tests/              its unit tests (pytest)
-scripts/            checks that produce results/ (step1_check.py)
+dpd/                the reference DPD (Python package); dpd/testing/: its test fixtures (test PA,
+                    signals, measures), used by the tests and the checks only
+scripts/            export_model.py: the weights and golden files for the twin
+checks/             the checks behind the results (step1_check, twin_check, resample_check, timing)
+tests/              the unit tests (pytest)
 results/            step reports; trained models (results/models/: *.pt for PyTorch, *.dpdt for the
                     twin, golden/*.dpdt to check it)
-cpp/                the C++/CUDA twin and the stage (CMake)
+cpp/                the C++/CUDA twin and the stage (CMake): src/, include/, tools/ (the programs
+                    that run: dpd_stage, tap_recorder), checks/ (the twin's checks), arof/ (the
+                    Pi's stage library, copied)
 docker/             the stage's image and compose service
 docs/               documentation
 environment.yml     the conda env
@@ -46,7 +50,7 @@ under [Provenance](#provenance).
 ```bash
 conda activate machine-learning
 python -m pytest -q                                  # unit tests, ~100 s
-python scripts/step1_check.py --device cuda          # ILA on the test PA, ~6 min (run in tmux)
+python checks/step1_check.py --device cuda          # ILA on the test PA, ~6 min (run in tmux)
 make -C cpp test                                     # the C++ model against the reference (golden files)
 make -C docker check                                 # build the image, GPU self-test in the container
 ```
@@ -57,7 +61,7 @@ Details: [docs/howto/jetson.md](docs/howto/jetson.md).
 
 | # | Step | Output | Status |
 |---|---|---|---|
-| 1 | Reference transformer DPD in PyTorch; ILA on a test PA; NMSE and EVM with and without the DPD | `dpd/`, `tests/`, `scripts/step1_check.py`, `results/step1.txt` | done |
+| 1 | Reference transformer DPD in PyTorch; ILA on a test PA; NMSE and EVM with and without the DPD | `dpd/`, `tests/`, `checks/step1_check.py`, `results/step1.txt` | done |
 | — | Container base: the stage's image (CUDA 13.2, sm_87) and the C++ build | `docker/`, `cpp/` | done |
 | 2 | The transformer as hand-written CUDA kernels on the Jetson's GPU (float32): checked against the reference; throughput at the BASEBAND frame size | `dpd/export.py`, `cpp/` | done (branch `cuda-kernels`, to merge after review) |
 | 3 | The `dpd` stage: frame v2 and the stage contract (a copy of the Pi's stage library), `bypass` and `dpd` modes, the PA tap; tested with a Python feeder and sink; the hookup to the Pi proposed | `dpd/resample.py`, `dpd/stream.py`, `cpp/`, `docker/`, `tests/` | in progress (branch `dpd-stage`): the resampler, the stage library, the stage, the hookup proposed |
@@ -139,7 +143,7 @@ Details: [docs/twin/](docs/twin/README.md).
 `GpuModel` (`cpp/src/gpu_model.cu`): the transformer as one CUDA kernel per frame, one 128-thread
 block per output sample, the window and every intermediate in shared memory, a warp per token (the
 width, 32, is a warp's). `CpuModel` now has the same interface (`predistort`, `trace`), and both are
-checked by the same code (`cpp/tools/model_check.h`). Against the golden files: output within 8.0e-7
+checked by the same code (`cpp/checks/model_check.h`). Against the golden files: output within 8.0e-7
 and 9.2e-7 of the reference, every intermediate within 1.7e-6, and within 7.6e-7 of `CpuModel`; the
 same in the image. Speed, the kernel alone: **45.5 ms per 6400-sample frame, 141 000 samples/s**,
 117 times one CPU core; enough for the 40 000 samples/s of 5 000 symbols/s at 8 samples per symbol,
@@ -156,17 +160,17 @@ symbols/s need at 50 samples per symbol are met with 54 % to spare. Details:
 
 ### Step 2, part 4 — the twin through the test PA (2026-11-20)
 
-`scripts/twin_check.py`: the step 1 validation and test drives predistorted by the reference and by
+`checks/twin_check.py`: the step 1 validation and test drives predistorted by the reference and by
 the twin (`cpp/bin/dpd_apply`, GPU and CPU), then through the test PA. The twin's outputs are within
 8.8e-7 of the reference's, and its NMSE and EVM equal the reference's to 9e-7 (dB, %), for both models:
 nominal PA -48.446 dB and 0.205 % on the test sequence, as the reference. The step 1 drive and
-measures moved into `dpd/evaluate.py`, shared by both checks (step 1's numbers unchanged). 27 unit
+measures moved into `dpd/testing/evaluate.py`, shared by both checks (step 1's numbers unchanged). 27 unit
 tests pass, among them the twin on a short drive. Details: [docs/twin/](docs/twin/README.md).
 
 ### Step 2, part 5 — latency and throughput per frame (2026-11-20)
 
 `cpp/tools/dpd_bench` times each frame as the stage will run it: copy in, kernel, copy out
-(`scripts/step2_timing.sh`, `results/step2_timing.txt`). Paced at the pipeline's rate (a 128-symbol
+(`checks/step2_timing.sh`, `results/step2_timing.txt`). Paced at the pipeline's rate (a 128-symbol
 frame every 25.6 ms), the latency is **17.3 ms median, 17.6 ms at most at 50 samples per symbol**
 (6400-sample frames, the GPU busy 67 %), and **8.9 ms median at 8** (1024-sample frames): both keep
 up. The copies cost 0.06 to 0.13 ms (shared memory). At 8 samples per symbol the light load lets
@@ -231,11 +235,11 @@ Copied or ported from `on-chip-training`, branch `dpd`:
 
 | Here | From | What |
 |---|---|---|
-| `dpd/pa.py` | `matlab/link/rf_amp.m` | the PA model, ported line for line |
-| `dpd/pa.py` | `matlab/link/default_link_odsb.m`, `matlab/core/impairment_sweeps_odsb.m` (`joint_nominal`) | the PA's parameters; the nominal case (saturation 1.5 a0, AM/PM on) |
-| `dpd/pa.py` | `matlab/results/pa_operating_point.txt` | the PA input's levels: pilot tone 1.104 a0, data 0.371 a0 RMS |
-| `dpd/signals.py` | `matlab/link/default_tx.m`, `transmit_receive_odsb.m` | 16QAM, RRC roll-off 0.75, span 16; `rcosdesign` and `upfirdn` ported |
-| `dpd/metrics.py` | `matlab/paper_rewrite/validation/main_pa_operating_point.m` | the EVM of the PA's output (gain and constant fitted, in-band) |
+| `dpd/testing/pa.py` | `matlab/link/rf_amp.m` | the PA model, ported line for line |
+| `dpd/testing/pa.py` | `matlab/link/default_link_odsb.m`, `matlab/core/impairment_sweeps_odsb.m` (`joint_nominal`) | the PA's parameters; the nominal case (saturation 1.5 a0, AM/PM on) |
+| `dpd/testing/pa.py` | `matlab/results/pa_operating_point.txt` | the PA input's levels: pilot tone 1.104 a0, data 0.371 a0 RMS |
+| `dpd/testing/signals.py` | `matlab/link/default_tx.m`, `transmit_receive_odsb.m` | 16QAM, RRC roll-off 0.75, span 16; `rcosdesign` and `upfirdn` ported |
+| `dpd/testing/metrics.py` | `matlab/paper_rewrite/validation/main_pa_operating_point.m` | the EVM of the PA's output (gain and constant fitted, in-band) |
 | `dpd/frame2.py` | `testbed/rpi/src/stage/frame2.h`, `testbed/rpi/tests/test_pipeline_e2e.py` (`tap_frames`) | frame version 2: the layout, the header struct |
 | `dpd/models.py`, `dpd/ila.py` | `matlab/dpd/README.md` | the DPD plan: the transformer's shape, ILA, the DPD rate, the seeds |
 | `docker/`, `cpp/` | `docs/testbed/rpi/PIPELINE.md` | the stage contract, the service name `dpd_bb`, `restart: "no"` |

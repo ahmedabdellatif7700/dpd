@@ -1,10 +1,10 @@
 """The resampler 50 <-> 8 samples per symbol (dpd/resample.py): the formula, the filter, the alignment,
-the round trip. The full check through the test PA is scripts/resample_check.py."""
+the round trip. The full check through the test PA is checks/resample_check.py."""
 import numpy as np
 from scipy.signal import freqz, upfirdn
 
 from dpd import resample as R
-from dpd import signals
+from dpd.testing import signals
 
 
 def test_filter():

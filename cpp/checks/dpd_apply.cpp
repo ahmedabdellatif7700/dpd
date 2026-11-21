@@ -5,7 +5,7 @@
 // in.dpdt holds a tensor "input" [n][2] (I/Q, the drive in the units the model was trained in);
 // out.dpdt gets "output" [n][2], the sequence taken whole (zeros beyond its ends), as the
 // reference's predistort() does. The bridge between the twin and the Python checks
-// (scripts/twin_check.py): numpy writes the drive, this tool predistorts it, numpy measures.
+// (checks/twin_check.py): numpy writes the drive, this tool predistorts it, numpy measures.
 #include <cstdio>
 #include <cstring>
 #include <exception>

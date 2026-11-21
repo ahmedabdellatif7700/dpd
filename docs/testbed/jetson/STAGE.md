@@ -93,7 +93,7 @@ At the model, the frame edges cost at most 0.1 dB: these models lean on the cent
 **Recommendation: 3a**, the simplest, at a measured cost of at most 0.1 dB with these models;
 to be measured again once the resampler (2b) is in.
 
-**Measured again with the resampler** (`scripts/resample_check.py`, `results/step3_resampler.txt`;
+**Measured again with the resampler** (`checks/resample_check.py`, `results/step3_resampler.txt`;
 the drive at 50 samples per symbol, 50 → 8, the model, 8 → 50, the test PA at 20 GS/s, nominal PA):
 
 | | NMSE | EVM symbols |

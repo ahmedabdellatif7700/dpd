@@ -3,7 +3,7 @@
 # for the BASEBAND frame at 50 samples per symbol (6400) and at 8 (1024, the same 128 symbols),
 # back to back and paced at the pipeline's arrival rate (128 symbols at 5000 symbols/s: 25.6 ms),
 # with pinned and pageable host memory. Writes results/step2_timing.txt. About 2 minutes.
-#   make -C cpp && scripts/step2_timing.sh
+#   make -C cpp && checks/step2_timing.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 BIN=cpp/bin/dpd_bench

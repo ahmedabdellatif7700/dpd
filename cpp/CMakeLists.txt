@@ -83,28 +83,30 @@ target_link_libraries(dpd_stage PRIVATE dpd_stage_lib)
 add_executable(tap_recorder tools/tap_recorder.cpp)
 target_link_libraries(tap_recorder PRIVATE arof_pipe)
 
+# ---- checks/: the twin against the reference (not needed to run the stage)
+
 # the C++ model against the PyTorch reference's golden files
-add_executable(golden_check tools/golden_check.cpp)
+add_executable(golden_check checks/golden_check.cpp)
 target_link_libraries(golden_check PRIVATE dpd_core)
 
 # the CUDA kernel against the golden files and the C++ model, and a first timing
-add_executable(cuda_check tools/cuda_check.cpp)
+add_executable(cuda_check checks/cuda_check.cpp)
 target_link_libraries(cuda_check PRIVATE dpd_gpu)
 
 # the resampler (CPU and GPU) against its golden file, and its time per frame
-add_executable(resampler_check tools/resampler_check.cpp)
+add_executable(resampler_check checks/resampler_check.cpp)
 target_link_libraries(resampler_check PRIVATE dpd_gpu)
 
 # predistort a drive file with the twin (CPU or GPU): the bridge to the Python checks
-add_executable(dpd_apply tools/dpd_apply.cpp)
+add_executable(dpd_apply checks/dpd_apply.cpp)
 target_link_libraries(dpd_apply PRIVATE dpd_gpu)
 
 # latency and throughput per frame on the GPU, as the stage will run it
-add_executable(dpd_bench tools/dpd_bench.cpp)
+add_executable(dpd_bench checks/dpd_bench.cpp)
 target_link_libraries(dpd_bench PRIVATE dpd_gpu)
 
 # the image's self-test: the GPU from inside the container
-add_executable(gpu_check tools/gpu_check.cu)
+add_executable(gpu_check checks/gpu_check.cu)
 
 # the checks, with the models exported by the reference (results/models/, scripts/export_model.py)
 enable_testing()

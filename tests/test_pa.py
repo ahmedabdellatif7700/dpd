@@ -1,9 +1,9 @@
-"""The test PA (dpd/pa.py) against values computed by hand from matlab/link/rf_amp.m's formulas
+"""The test PA (dpd/testing/pa.py) against values computed by hand from matlab/link/rf_amp.m's formulas
 (scalar arithmetic, independent of the vectorized port; the numbers are in README.md, step 1)."""
 import numpy as np
 import pytest
 
-from dpd.pa import GAN_3GPP, pa_chain, pa_params, rf_amp
+from dpd.testing.pa import GAN_3GPP, pa_chain, pa_params, rf_amp
 
 AMAM = pa_params(ampm={"enable": False})                    # Rapp only
 OFF = pa_params(enable=False, ampm={"enable": False})        # everything off

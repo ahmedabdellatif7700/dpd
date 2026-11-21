@@ -120,7 +120,7 @@ over all the steps, batches of 512 windows drawn at random (a fixed seed), 30 ep
 
 ## 5. The test PA
 
-`dpd/pa.py`, a port of on-chip-training `matlab/link/rf_amp.m`, line for line, `a0 = 1`:
+`dpd/testing/pa.py`, a port of on-chip-training `matlab/link/rf_amp.m`, line for line, `a0 = 1`:
 
 ```
 A_in = A / 10^((rop - rop_ref)/10)                                   AGC (rop = rop_ref in the chain)
@@ -136,7 +136,7 @@ is `x + 1.104` (the data at 0.371 a0 RMS plus the pilot tone), its output minus 
 
 ## 6. The measures
 
-`dpd/metrics.py`, each against the undistorted drive `x`, each fitting a complex gain `c` and a
+`dpd/testing/metrics.py`, each against the undistorted drive `x`, each fitting a complex gain `c` and a
 constant `k` by least squares (the tone's removal as a mean also takes the data's own mean):
 
 ```

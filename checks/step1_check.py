@@ -1,4 +1,4 @@
-"""Step 1 check: ILA of the transformer DPD on the test PA (dpd/pa.py), and its report.
+"""Step 1 check: ILA of the transformer DPD on the test PA (dpd/testing/pa.py), and its report.
 
 The drive x: 16QAM RRC at N_DPD = 8 samples per symbol (3.2 GS/s), scaled to the data's RMS at the
 PA input (0.371 a0); the PA sees x plus the pilot tone (1.104 a0), its output has the tone removed.
@@ -6,7 +6,7 @@ Two PA cases: the nominal link's (Rapp + AM/PM, memoryless) and the same with rf
 option on. Training sequence seed 1, validation 4242, test 2017 (the seeds of matlab/dpd/README.md).
 Writes results/step1.json, results/step1.txt and the trained models (results/models/*.pt).
 
-    python scripts/step1_check.py [--device cuda|cpu] [--passes 3] [--epochs 30]
+    python checks/step1_check.py [--device cuda|cpu] [--passes 3] [--epochs 30]
 """
 import argparse
 import json
@@ -19,9 +19,9 @@ import numpy as np
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from dpd import pa, signals                               # noqa: E402
-from dpd.evaluate import FS, drive, measures              # noqa: E402
-from dpd.evaluate import link as make_link                # noqa: E402
+from dpd.testing import pa, signals                               # noqa: E402
+from dpd.testing.evaluate import FS, drive, measures              # noqa: E402
+from dpd.testing.evaluate import link as make_link                # noqa: E402
 from dpd.ila import ila                                   # noqa: E402
 from dpd.models import DPD, TransformerDPD                # noqa: E402
 
@@ -70,7 +70,7 @@ def main():
     with open(os.path.join(a.out, "step1.json"), "w") as f:
         json.dump(rep, f, indent=1)
     m = rep["model"]
-    lines = [f"Step 1: transformer DPD by ILA on the test PA (dpd/pa.py), {a.device} ({rep['env']['gpu'] or 'CPU'}), "
+    lines = [f"Step 1: transformer DPD by ILA on the test PA (dpd/testing/pa.py), {a.device} ({rep['env']['gpu'] or 'CPU'}), "
              f"torch {torch.__version__}",
              f"Model: window {m['window']}, width {m['d_model']}, {m['n_heads']} heads, {m['n_layers']} layers, FF {m['d_ff']}: "
              f"{m['params']} parameters, {m['macs'] / 1e3:.1f} k MAC = {m['flops'] / 1e3:.1f} k FLOP per sample",

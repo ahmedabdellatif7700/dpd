@@ -18,7 +18,7 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from dpd import pa, signals                                  # noqa: E402
+from dpd.testing import pa, signals                                  # noqa: E402
 from dpd.export import (export_golden, export_resampler, export_resampler_golden, export_weights,  # noqa: E402
                         load_weights, read_tensors)
 from dpd.models import DPD                                   # noqa: E402

@@ -9,16 +9,16 @@
 git pull
 conda activate machine-learning        # ~/miniconda3; created from environment.yml
 python -m pytest -q                     # the unit tests, ~100 s (CPU, and CUDA and the twin where built)
-tmux new -s step1 'python scripts/step1_check.py --device cuda'
+tmux new -s step1 'python checks/step1_check.py --device cuda'
                                         # ILA on the test PA, ~6 min on the GPU:
                                         # results/step1.txt, step1.json, results/models/*.pt
 python scripts/export_model.py          # the weights and golden files for the twin:
                                         # results/models/*.dpdt, results/models/golden/*.dpdt
-python scripts/twin_check.py            # the twin (cpp/bin/dpd_apply, after make -C cpp) through the
+python checks/twin_check.py            # the twin (cpp/bin/dpd_apply, after make -C cpp) through the
                                         # test PA against the reference: results/step2_twin.txt
-python scripts/resample_check.py        # the resampler 50 <-> 8 and the DPD through it, ~2 min:
+python checks/resample_check.py        # the resampler 50 <-> 8 and the DPD through it, ~2 min:
                                         # results/step3_resampler.txt
-scripts/step2_timing.sh                 # latency and throughput per frame on the GPU, ~2 min:
+checks/step2_timing.sh                 # latency and throughput per frame on the GPU, ~2 min:
                                         # results/step2_timing.txt
 ```
 

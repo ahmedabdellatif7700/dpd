@@ -8,7 +8,7 @@ at the PA's output with no DPD, the reference and the twin. The twin passes if i
 within --tol of the reference's and its NMSE and EVM equal the reference's to 0.01 (dB, %).
 Writes results/step2_twin.json and results/step2_twin.txt.
 
-    python scripts/twin_check.py [--bin cpp/bin/dpd_apply] [--tol 1e-5]
+    python checks/twin_check.py [--bin cpp/bin/dpd_apply] [--tol 1e-5]
 """
 import argparse
 import json
@@ -20,12 +20,12 @@ import tempfile
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from dpd import pa                                            # noqa: E402
-from dpd.evaluate import drive, link, measures                # noqa: E402
+from dpd.testing import pa                                            # noqa: E402
+from dpd.testing.evaluate import drive, link, measures                # noqa: E402
 from dpd.export import read_tensors, write_tensors            # noqa: E402
 from dpd.models import DPD, to_iq                             # noqa: E402
 
-# the trained models and the PA each was trained for (scripts/step1_check.py)
+# the trained models and the PA each was trained for (checks/step1_check.py)
 CASES = {"transformer_nominal": pa.pa_params(), "transformer_nominal_memory": pa.pa_params(memory={"enable": True})}
 SEQUENCES = {"validation": 4242, "test": 2017}
 N_SYM = 2048

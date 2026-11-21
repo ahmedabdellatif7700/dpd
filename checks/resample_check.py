@@ -11,7 +11,7 @@
    drive taken whole. Test sequence (seed 2017), 2048 symbols.
 Writes results/step3_resampler.txt and .json.
 
-    python scripts/resample_check.py
+    python checks/resample_check.py
 """
 import json
 import os
@@ -21,8 +21,9 @@ import numpy as np
 from scipy.signal import freqz, upfirdn
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from dpd import metrics, pa, resample as R, signals          # noqa: E402
-from dpd.evaluate import drive, link, measures               # noqa: E402
+from dpd import resample as R                                # noqa: E402
+from dpd.testing import metrics, pa, signals                 # noqa: E402
+from dpd.testing.evaluate import drive, link, measures               # noqa: E402
 from dpd.models import DPD                                   # noqa: E402
 
 FS50 = signals.RS * R.SPS_PIPELINE

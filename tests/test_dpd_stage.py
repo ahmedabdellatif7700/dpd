@@ -24,7 +24,7 @@ import pytest
 
 from dpd import frame2 as F
 from dpd import resample as R
-from dpd import signals
+from dpd.testing import signals
 from dpd.models import DPD
 from dpd.stream import FrameStream
 
