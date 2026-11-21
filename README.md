@@ -229,6 +229,18 @@ Clocks: chrony with the Pi serving the Jetson (the Jetson now follows the public
 distance, too coarse for the latency logs), for the user to set up. The bring-up: bypass through the
 Jetson (the board's bytes unchanged), a recording, training on it, then dpd mode.
 
+### Step 3, part 5 — bypass and a recording through the Jetson (2026-11-21)
+
+The Pi's side of the hookup moved from `patches/` to its own repository, `arof-pipeline` (a copy of
+on-chip-training's pipeline that runs on the Pi; on-chip-training unchanged): the compose override,
+the `co_optics` change (bit for bit as before with no DPD: `pipeline_bitexact` passes on the Pi),
+the run settings, `ue_dsp`'s tap and `evaluate_rx.py`. The bypass run, 200 000 symbols of the
+nominal link through the Jetson: every stage on both machines exited 0 at END; the receiver without
+an equalizer at 19.46 % EVM, 5.33e-2 SER, 1.33e-2 BER (the DPD's baseline); the stage's processing
+60 µs per frame (median). Then the recording for ILA: the drive x_d and the PA's output y, 10 million
+samples each, contiguous from the calibration block, on the Jetson (`records/`, not in git). Details:
+[HOOKUP.md](docs/testbed/jetson/HOOKUP.md).
+
 ## Provenance
 
 Copied or ported from `on-chip-training`, branch `dpd`:

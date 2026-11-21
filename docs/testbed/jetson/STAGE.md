@@ -3,8 +3,8 @@
 Status: **decided by the user on 2026-11-20: 1a, 2b and 3b.** 3a was chosen first; the
 resampler's measurement (below) showed that cutting each frame costs 12.5 dB once the resampling
 filters are in, and the user changed it to 3b. The change
-on the Pi that 1a needs (`co_optics` reading κ) is prepared as a patch for the user; nothing in
-on-chip-training is changed from this repository. The stage takes the place of the Pi's pass-through `dpd_bb`
+on the Pi that 1a needs (`co_optics` reading κ) was prepared as a patch; it is now a commit of
+`arof-pipeline`, the Pi's copy of the pipeline (HOOKUP.md), and on-chip-training is unchanged. The stage takes the place of the Pi's pass-through `dpd_bb`
 (on-chip-training `docs/testbed/rpi/PIPELINE.md`): it receives the `source`'s BASEBAND frames (the
 RRC waveform `s`, 50 samples per symbol at 20 GS/s, 6400 samples per 128-symbol frame, complex128),
 predistorts them with the twin (`GpuModel`) and sends them to `co_optics`; every other frame (CONFIG,
