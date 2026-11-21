@@ -1,9 +1,9 @@
-"""The test drive and the measures at the PA's output, shared by the checks (scripts/step1_check.py,
-scripts/twin_check.py), so that the PyTorch reference and the C++/CUDA twin are measured the same
+"""The test drive and the measures at the PA's output, shared by the checks (checks/step1_check.py,
+checks/twin_check.py), so that the PyTorch reference and the C++/CUDA twin are measured the same
 way.
 
 The drive: 16QAM RRC at N_DPD = 8 samples per symbol (3.2 GS/s), scaled to the data's RMS at the PA
-input (0.371 a0). The link: the test PA (dpd/pa.py) driven with the drive plus the pilot tone, its
+input (0.371 a0). The link: the test PA (dpd/testing/pa.py) driven with the drive plus the pilot tone, its
 output with the tone removed.
 """
 import numpy as np

@@ -1,8 +1,8 @@
 """ILA on the test PA: a short run, the DPD must improve the PA output's NMSE and EVM.
-The full check with its report is scripts/step1_check.py."""
+The full check with its report is checks/step1_check.py."""
 import numpy as np
 
-from dpd import metrics, pa, signals
+from dpd.testing import metrics, pa, signals
 from dpd.ila import ila
 from dpd.models import DPD, TransformerDPD
 

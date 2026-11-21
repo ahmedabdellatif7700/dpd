@@ -1,0 +1,18 @@
+Step 3: the resampler 50 <-> 8 samples per symbol (dpd/resample.py) and the DPD through it
+
+1. filter: 503 taps at 80 GS/s, passband (to 1.2 GHz) ripple 0.0017 dB, stopband (from 2.0 GHz) -80.3 dB
+2. the formula against scipy.signal.upfirdn: largest difference 1.9e-15
+3. 50 -> 8 against the waveform made at 8: gain 2.49990 (sqrt(50/8) = 2.5, the RRC's), error -68.7 dB, no delay
+4. round trip 50 -> 8 -> 50: error -70.8 dB on the whole drive, -35.3 dB with each 6400-sample frame alone
+
+5. the DPD through the resampler, then the test PA at 20 GS/s; test drive (seed 2017), 2048 symbols
+   PA           DPD                                           NMSE dB  EVM wf % EVM sym %
+   nominal      none (at 50)                                   -14.86    17.560    17.294
+   nominal      reference at 8 (step 1)                        -48.45     0.223     0.205
+   nominal      at 50 through the resampler, drive whole       -47.79     0.223     0.205
+   nominal      at 50 through the resampler, frames alone      -35.25     0.620     0.544
+   memory       none (at 50)                                   -10.68    28.477    27.324
+   memory       reference at 8 (step 1)                        -16.19     9.887     7.958
+   memory       at 50 through the resampler, drive whole       -16.08    10.141     8.109
+   memory       at 50 through the resampler, frames alone      -15.87    10.236     8.127
+   (the memory PA at 20 GS/s delays by round(0.6 ns x 20 GS/s) = 12 samples = 0.600 ns; the model was trained at 3.2 GS/s, where it is 2 samples = 0.625 ns)

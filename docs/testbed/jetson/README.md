@@ -60,7 +60,7 @@ sm_87 builds, but for CUDA 12 and L4T R36.
 
 | Stage | Base | Content |
 |---|---|---|
-| build | `nvidia/cuda:13.2.0-devel-ubuntu24.04` | CMake + Ninja + ccache; `cpp/` compiled for sm_87 (native code, no JIT at start-up) |
+| build | `nvidia/cuda:13.2.0-devel-ubuntu24.04` | CMake + Ninja + ccache + nlohmann/json (the stage library's); `cpp/` compiled for sm_87 (native code, no JIT at start-up) |
 | run | `nvidia/cuda:13.2.0-runtime-ubuntu24.04` | the binaries only, in `/opt/arof-dpd` (image 5.8 GB, against 10.4 GB for the devel base) |
 
 CUDA 13.2 matches the host's driver; a newer CUDA in the image would need the forward-compatibility
@@ -71,7 +71,7 @@ host's driver, and NVIDIA Container Toolkit 1.19.1's CDI `enable-cuda-compat` ho
 timing log is `dpd_bb.csv` — with `runtime: nvidia` and `restart: "no"` (the stage contract: a
 stage never restarts, since it could not resume its stream). The trained weights,
 `results/models/`, are mounted read-only at `/models`. Until step 3 the service runs `gpu_check`
-(`cpp/tools/gpu_check.cu`), the image's self-test: it reports the CUDA runtime, the driver and the
+(`cpp/checks/gpu_check.cu`), the image's self-test: it reports the CUDA runtime, the driver and the
 device, runs a kernel on one BASEBAND frame (6400 complex samples) and checks it against the CPU.
 
 ```text
@@ -122,6 +122,11 @@ images above.
 
 The three decisions it is built on (κ, the DPD's rate, frame boundaries), with the facts, the
 options and the choice made (2026-11-20): [STAGE.md](STAGE.md).
+
+## The hookup
+
+The stage in the Pi's pipeline: the wiring (Pi 192.168.91.80, Jetson 192.168.91.89), the Pi's
+compose override and patch, the clocks, the bring-up in order: [HOOKUP.md](HOOKUP.md).
 
 ## Running
 

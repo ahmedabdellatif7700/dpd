@@ -1,6 +1,8 @@
 # The `dpd` stage (step 3): the three decisions
 
-Status: **decided by the user on 2026-11-20: 1a, 2b and 3a**, the recommendations below. The change
+Status: **decided by the user on 2026-11-20: 1a, 2b and 3b.** 3a was chosen first; the
+resampler's measurement (below) showed that cutting each frame costs 12.5 dB once the resampling
+filters are in, and the user changed it to 3b. The change
 on the Pi that 1a needs (`co_optics` reading κ) is prepared as a patch for the user; nothing in
 on-chip-training is changed from this repository. The stage takes the place of the Pi's pass-through `dpd_bb`
 (on-chip-training `docs/testbed/rpi/PIPELINE.md`): it receives the `source`'s BASEBAND frames (the
@@ -88,14 +90,83 @@ At the model, the frame edges cost at most 0.1 dB: these models lean on the cent
 | 3b | a **continuous** stream with a delay: keep the previous frame's tail, wait for the next frame's head; output frame k holds the samples shifted by the look-ahead (`first_sample` says so, as `fiber`) | exact: equal to the reference on the uncut drive | up to one frame (25.6 ms) more latency; state across frames; the shift travels down the chain: `co_optics` takes the calibration block as the first `n_block` samples of the `CALIB` frames, which would then start a few samples early, and `ue_dsp` must absorb the delay in its timing (to verify on the Pi); the last held samples have no frame to leave in at the END |
 | 3c | the previous frame's tail kept, zeros ahead | no delay; the past exact | state across frames, for no measured gain over 3a |
 
-**Recommendation: 3a**, the simplest. **Decided: 3a**, at a measured cost of at most 0.1 dB with these models;
-to be measured again once the resampler (2b) is in, and with the models trained on the Pi's recordings.
-3b stays the exact fallback if the edges cost more then.
+**Recommendation: 3a**, the simplest, at a measured cost of at most 0.1 dB with these models;
+to be measured again once the resampler (2b) is in.
+
+**Measured again with the resampler** (`checks/resample_check.py`, `results/step3_resampler.txt`;
+the drive at 50 samples per symbol, 50 → 8, the model, 8 → 50, the test PA at 20 GS/s, nominal PA):
+
+| | NMSE | EVM symbols |
+|---|---|---|
+| reference at 8 samples per symbol (step 1) | -48.45 dB | 0.205 % |
+| through the resampler, the drive whole | -47.79 dB | 0.205 % |
+| 3a: each 6400-sample frame alone | **-35.25 dB** | 0.544 % |
+| 3c: 300 samples of the previous frame kept, zeros ahead | -36.18 dB | 0.409 % |
+| 3b: 300 samples kept behind, 300 waited for ahead | **-47.79 dB** | **0.205 %** |
+
+The resampling filters reach about 63 samples (at 50 per symbol) into each neighbouring frame and
+ring at a cut; the model's window adds 94 (15 at 8). Only the look-ahead recovers the drive whole.
+
+**Decided: 3b**, as a holdback like `fiber`'s:
+
+- the stage keeps the last D samples of each BASEBAND frame (D = 250, 5 symbols, above the
+  look-ahead of the two filters and the window, ~220) and the samples behind them as context;
+  each output frame carries the samples it can complete, `first_sample` saying which: the signal
+  is not delayed, only packed differently. The frame's processing is unchanged; its last D samples
+  wait for the next frame (25.6 ms at most);
+- at `CALIB_END` the stage flushes what it holds (it holds the whole calibration group anyway for
+  κ, decision 1a), so the group leaves complete and the source's tail needs no change. The group
+  then starts D samples before the block: `ue_frontend` and `ue_dsp` locate the block by
+  `first_sample` already (`link_stages.cpp`, lines 447-451 and 545-547); `co_optics` takes the
+  first `n_block` samples of the group (line 228), so the 1a patch also makes it locate the block
+  by `first_sample`;
+- at END the last D samples of the stream have no frame to leave in and are dropped, as `fiber`'s
+  holdback is.
 
 ## What follows from the decisions
 
-1a, 2b and 3a give a stage that, for each BASEBAND frame: resamples it to 8 samples per symbol,
-predistorts it on the GPU, resamples it back to 50, and sends it on, with the frame's own samples
-and header; holds the calibration block once per calibration to compute κ from it, undistorted,
-and writes κ into its `pipeline` line; forwards CONFIG, REF and END. The one change on the Pi:
-`co_optics` reads κ from that line when it is there.
+1a, 2b and 3b give a stage that, for each BASEBAND frame: appends it to what it holds, resamples to
+8 samples per symbol, predistorts on the GPU and resamples back to 50 the samples it can complete,
+and sends those on, keeping the last 250; holds the calibration group once per calibration, computes
+κ from its undistorted block, writes κ into its `pipeline` line, and flushes the group whole; and
+forwards CONFIG, REF and END. The change on the Pi, one patch to `co_optics`: use the κ of that line
+when it is there, and locate the block by `first_sample`.
+
+## The stage as built
+
+`cpp/bin/dpd_stage` (`cpp/src/dpd_stage.cpp`, on the copied stage library `cpp/arof/`), the command
+of the `dpd_bb` service (`docker/compose.yaml`). Its section of the settings file, carried to it in
+the CONFIG frame as the Pi's source carries `"taps"` and `"log"`:
+
+```json
+"dpd": {"bb": {"mode": "dpd", "model": "transformer_nominal"}}
+```
+
+| | `"mode": "bypass"` (the default) | `"mode": "dpd"` |
+|---|---|---|
+| BASEBAND | forwarded untouched, byte for byte | predistorted: `s → DPD(κ·s)/κ`, DPD = 50 → 8, the model, 8 → 50, through the 250-sample holdback (`FrameStream`, `dpd/stream.py`'s counterpart) |
+| calibration group | passes | held; κ from its block (co_optics's formula, on the undistorted `s`); leaves whole, κ in the stage's `pipeline` line (`"calibration": {"kappa": …}`) |
+| CONFIG | the stage's line `{"stage": "dpd_bb", "in"/"out": "BASEBAND", "mode": "bypass"}` | also `model`, `device`, `dpd_sps` 8, `hold_samples` 250, and the calibration |
+| REF, END | forwarded | forwarded |
+| dtype | as it comes | complex128 or complex64 in, the same out; float32 inside |
+
+Environment: `AROF_STAGE`, `AROF_IN`, `AROF_OUT`, `AROF_TAP`, `AROF_LOG_DIR`,
+`AROF_CONNECT_TIMEOUT_S` as every stage (the library's); `AROF_MODELS_DIR` (default `/models`: the
+weights `<model>.dpdt` and `resampler.dpdt`) and `AROF_DPD_DEVICE` (`cuda`, default, or `cpu`). It
+stops with a message and exit code 1 on: a stage before it that does not produce BASEBAND, a dtype it
+cannot take, a non-contiguous drive, a calibration block of another size than the CONFIG frame's,
+settings not at 50 samples per symbol, a missing model.
+
+**Tested without the Pi** (`tests/test_dpd_stage.py`): a feeder sends what the Pi's source sends (a
+CONFIG frame, the calibration block of 552 symbols in 128-symbol frames with their REF frames, a
+30-symbol tail, 3 data frames, END), a sink records what comes out, the stage runs between them over
+TCP, on the host or in the image (`DPD_STAGE_DOCKER=1`):
+
+| Test | Result |
+|---|---|
+| bypass | every frame byte for byte as it came; the CONFIG frame gains the stage's line, nothing else |
+| dpd, κ | in the stage's line, bit for bit co_optics's formula on the undistorted block (1.2822809823405896) |
+| dpd, BASEBAND | equal to the reference applied offline (PyTorch model, resampler, `dpd/stream.py`): within 9.9e-7 on CUDA, 1.2e-6 on the CPU |
+| dpd, the frames | one out per frame in (20), in order, seq and flags kept; REF and END unchanged; the drive contiguous by `first_sample`; the calibration group leaves whole (its last frame: the 30-symbol tail and the 250 held samples) |
+| a wrong pipeline | exit code 1, `dpd_bb consumes BASEBAND, but the stage before it, source, produces OPTICAL` |
+| the timing log | `dpd_bb.csv`, one line per frame, the library's columns |

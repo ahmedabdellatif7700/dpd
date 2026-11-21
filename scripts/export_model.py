@@ -18,8 +18,9 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from dpd import pa, signals                                  # noqa: E402
-from dpd.export import export_golden, export_weights, load_weights, read_tensors   # noqa: E402
+from dpd.testing import pa, signals                                  # noqa: E402
+from dpd.export import (export_golden, export_resampler, export_resampler_golden, export_weights,  # noqa: E402
+                        load_weights, read_tensors)
 from dpd.models import DPD                                   # noqa: E402
 
 FRAME = 6400          # samples in one BASEBAND frame (128 symbols x 50)
@@ -60,6 +61,20 @@ def main():
         t = read_tensors(g)
         print(f"{name}: {w} ({os.path.getsize(w)} B, {len(read_tensors(w))} tensors), "
               f"{g} ({os.path.getsize(g)} B: {', '.join(f'{k} {list(v.shape)}' for k, v in t.items())})")
+    export_resampler_files(os.path.dirname(a.models[0]) or ".")
+
+
+def export_resampler_files(models_dir):
+    """the resampler 50 <-> 8 (dpd/resample.py) and its golden frame: the BASEBAND drive at 50
+    samples per symbol, a 6400-sample frame from the middle of the step 1 test drive"""
+    w = os.path.join(models_dir, "resampler.dpdt")
+    g = os.path.join(models_dir, "golden", "resampler.dpdt")
+    export_resampler(w)
+    s, _ = signals.baseband(256, sps=50, seed=2017)
+    x = s * pa.DATA_RMS_A0 / np.sqrt(np.mean(np.abs(s) ** 2))
+    export_resampler_golden(x[3200:3200 + FRAME], g)
+    t = read_tensors(g)
+    print(f"resampler: {w} ({os.path.getsize(w)} B), {g} ({', '.join(f'{k} {list(v.shape)}' for k, v in t.items())})")
 
 
 if __name__ == "__main__":

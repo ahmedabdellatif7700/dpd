@@ -83,3 +83,19 @@ def test_golden(tmp_path):
     emb0 = g["probe.embed"][0]
     base = d.model.pos.detach().numpy() + d.model.embed.bias.detach().numpy()
     assert np.allclose(emb0[:16], base[:16], atol=1e-6)
+
+
+def test_resampler_export(tmp_path):
+    from dpd import resample as R
+    from dpd.export import export_resampler, export_resampler_golden
+    export_resampler(tmp_path / "r.dpdt")
+    t = read_tensors(tmp_path / "r.dpdt")
+    assert t["resampler.ratio"].tolist() == [R.UP, R.DOWN]
+    assert np.array_equal(t["resampler.h"], R.lowpass().astype(np.float32))
+    r = np.random.default_rng(9)
+    x = (0.3 * (r.standard_normal(6400) + 1j * r.standard_normal(6400))).astype(np.complex64)
+    export_resampler_golden(x, tmp_path / "g.dpdt")
+    g = read_tensors(tmp_path / "g.dpdt")
+    assert g["down"].shape == (1024, 2) and g["up"].shape == (6400, 2)
+    down = R.to_dpd(x.astype(np.complex128))
+    assert np.allclose(g["down"][:, 0] + 1j * g["down"][:, 1], down, atol=1e-6)

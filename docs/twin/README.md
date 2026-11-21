@@ -18,13 +18,21 @@ The weights files are named after the test PA they were trained on, not after a 
 | `include/dpd/weights.h`, `src/weights.cpp` | `Config`, `Weights`, `load_weights`: every tensor of the model, each shape checked against the config, no tensor left over |
 | `include/dpd/cpu_model.h`, `src/cpu_model.cpp` | `CpuModel`, the model in plain C++ on the CPU; underneath it `forward_window` (one window, with an optional trace) and `window_at` |
 | `include/dpd/gpu_model.h`, `src/gpu_model.cu` | `GpuModel`, the model as one fused CUDA kernel |
-| `tools/model_check.h` | the check both tools share: a model against a golden file |
-| `tools/golden_check.cpp` | `CpuModel` against a golden file, and its speed on one core |
-| `tools/cuda_check.cpp` | `GpuModel` against a golden file and against `CpuModel`, and the kernel's speed |
-| `tools/dpd_bench.cpp` | the latency and throughput per frame on the GPU, as the stage will run it (`scripts/step2_timing.sh`) |
-| `tools/dpd_apply.cpp` | predistorts a drive file on the GPU or the CPU: the bridge to the Python checks |
-| `tools/gpu_check.cu` | the image's GPU self-test |
-| `CMakeLists.txt`, `Makefile` | the libraries `dpd_core` (CPU) and `dpd_gpu` (CUDA), the tools, the ctest checks |
+| `include/dpd/resampler.h`, `cpu_resampler.h`, `gpu_resampler.h`; `src/cpu_resampler.cpp`, `src/gpu_resampler.cu` | the resampler 50 ↔ 8 (`ResamplerFilter`, `load_resampler`; `CpuResampler` and `GpuResampler`, one interface) |
+| `include/dpd/device_buffer.h`, `src/device_buffer.cu`, `src/cuda_util.h` | GPU memory owned by a `unique_ptr` (`DeviceBuffer`); `check` and `device_alloc` for the CUDA sources |
+| `checks/resampler_check.cpp` | the resampler, CPU and GPU, against its golden file, and its time per frame |
+| `include/dpd/frame_stream.h`, `src/frame_stream.cpp` | `FrameStream`: the 250-sample holdback (decision 3b), `dpd/stream.py` line for line |
+| `include/dpd/dpd_chain.h` | `DpdChain`: 50 → 8, the model, 8 → 50, over the shared interface (CPU or GPU) |
+| `include/dpd/dpd_stage.h`, `src/dpd_stage.cpp`, `tools/dpd_stage_main.cpp` | the `dpd` stage on the stage library: bypass and dpd modes, κ, the stream; the program `dpd_stage` (docs/testbed/jetson/STAGE.md) |
+| `arof/` | the Pi's stage library, copied verbatim (frame v2, `StageRunner`, `run_filter`, the tap, the timing log) with its test; source commit and checksums in `arof/README.md` |
+| `tools/tap_recorder.cpp` | records a tap's frames to a file (the PA's output and the stage's own: the ILA data) |
+| `checks/model_check.h` | the check both tools share: a model against a golden file |
+| `checks/golden_check.cpp` | `CpuModel` against a golden file, and its speed on one core |
+| `checks/cuda_check.cpp` | `GpuModel` against a golden file and against `CpuModel`, and the kernel's speed |
+| `checks/dpd_bench.cpp` | the latency and throughput per frame on the GPU, as the stage will run it (`checks/step2_timing.sh`) |
+| `checks/dpd_apply.cpp` | predistorts a drive file on the GPU or the CPU: the bridge to the Python checks |
+| `checks/gpu_check.cu` | the image's GPU self-test |
+| `CMakeLists.txt`, `Makefile` | the libraries `arof_pipe` (the stage library), `dpd_core` (CPU) and `dpd_gpu` (CUDA), the tools, the ctest checks |
 
 ## The two models
 
@@ -110,13 +118,22 @@ through the layers. The same numbers come out of the image (`arof-dpd:local`, wi
 `results/models/` mounted at `/models`). A mismatched model and golden file, a truncated file and a
 file without weights are each rejected.
 
+## The resampler
+
+The stage runs the model at 8 samples per symbol between two resamplings (decision 2b):
+`CpuResampler` and `GpuResampler` implement `dpd/resample.py`'s formula,
+`y[m] = up · Σₖ x[k] h[c + m·down − k·up]`, the same way (the GPU: one thread per output sample),
+with the reference's 503 taps (`results/models/resampler.dpdt`). Against the golden frame
+(`resampler_check`, ctest): 50 → 8 within 8.8e-7, 8 → 50 within 5.5e-7, CPU and GPU alike; on the
+GPU, 0.041 ms (50 → 8) and 0.024 ms (8 → 50) per 6400-sample frame, under 1 % of the model's time.
+
 ## Through the test PA
 
-`scripts/twin_check.py` closes the loop: the drive of step 1 (validation seed 4242 and test seed
+`checks/twin_check.py` closes the loop: the drive of step 1 (validation seed 4242 and test seed
 2017, 2048 symbols, 16 505 samples each) is predistorted by the reference (PyTorch) and by the twin
 (`dpd_apply`, on the GPU and on the CPU), and each goes through the test PA the model was trained
 for. Numpy writes the drive to a DPDT file, `dpd_apply` predistorts it, numpy reads the output and
-measures it (`dpd/evaluate.py`, the same code as step 1), so there are no bindings to debug.
+measures it (`dpd/testing/evaluate.py`, the same code as step 1), so there are no bindings to debug.
 
 | Model | Sequence | NMSE, dB: none → PyTorch → twin | EVM symbols, %: none → PyTorch → twin |
 |---|---|---|---|
@@ -130,6 +147,14 @@ EVM by at most 9e-7 (dB, percentage points), on the GPU and the CPU alike (`resu
 tolerances 1e-5 and 0.01). The twin linearizes the PA exactly as the reference does.
 `tests/test_twin.py` repeats the comparison on a short drive within `pytest`, and is skipped where
 the C++ tools are not built.
+
+## The dpd stage
+
+`dpd_stage` runs the chain above as the pipeline's `dpd_bb`: it consumes BASEBAND at 50 samples per
+symbol, predistorts `κ·s` through the resampler and the model with a 250-sample holdback, and
+forwards everything else, on the Pi's stage library. Its design, settings and tests (bypass byte for
+byte; dpd within 1e-6 of the reference offline, κ bit for bit co_optics's; on the host and in the
+image): [docs/testbed/jetson/STAGE.md](../testbed/jetson/STAGE.md).
 
 ## Speed
 
@@ -159,7 +184,7 @@ meets both, with 54 % to spare at 50.
 
 `dpd_bench` times what the stage does with each frame: copy it to the GPU, run the kernel, copy the
 result back, wait (one CUDA stream); 1 000 frames per run, wall time on the host
-(`scripts/step2_timing.sh`, `results/step2_timing.txt`). Two frame sizes: the BASEBAND frame at 50
+(`checks/step2_timing.sh`, `results/step2_timing.txt`). Two frame sizes: the BASEBAND frame at 50
 samples per symbol (6400) and the same 128 symbols at 8 (1024), should the stage resample. Back to
 back, and paced at the pipeline's arrival rate: a 128-symbol frame every 25.6 ms at 5 000 symbols/s.
 

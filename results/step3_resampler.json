@@ -1,0 +1,64 @@
+{
+ "filter": {
+  "taps": 503,
+  "passband_ripple_db": 0.001691790058762011,
+  "stopband_db": -80.27424681621642
+ },
+ "formula_vs_upfirdn": 1.897149936107019e-15,
+ "alignment": {
+  "gain": 2.499904397075579,
+  "error_db": -68.73503303746467
+ },
+ "round_trip": {
+  "whole_db": -70.78511584961029,
+  "frames_alone_db": -35.31807553083342
+ },
+ "dpd": {
+  "nominal": {
+   "none (at 50)": {
+    "nmse_db": -14.859940935635244,
+    "evm_waveform_pct": 17.560074033758454,
+    "evm_symbols_pct": 17.294107965482905
+   },
+   "reference at 8 (step 1)": {
+    "nmse_db": -48.4463715127598,
+    "evm_waveform_pct": 0.222528844073787,
+    "evm_symbols_pct": 0.20534678054188243,
+    "papr_in_db": 5.387558401910109
+   },
+   "at 50 through the resampler, drive whole": {
+    "nmse_db": -47.78906899487797,
+    "evm_waveform_pct": 0.22254261550821264,
+    "evm_symbols_pct": 0.2051970377405533
+   },
+   "at 50 through the resampler, frames alone": {
+    "nmse_db": -35.245956118908595,
+    "evm_waveform_pct": 0.6198558854744723,
+    "evm_symbols_pct": 0.5443400910906911
+   }
+  },
+  "memory": {
+   "none (at 50)": {
+    "nmse_db": -10.676454442353982,
+    "evm_waveform_pct": 28.47716874704449,
+    "evm_symbols_pct": 27.32379879623817
+   },
+   "reference at 8 (step 1)": {
+    "nmse_db": -16.192420468219314,
+    "evm_waveform_pct": 9.887113614806061,
+    "evm_symbols_pct": 7.958035425526842,
+    "papr_in_db": 4.694895435039507
+   },
+   "at 50 through the resampler, drive whole": {
+    "nmse_db": -16.079161200995937,
+    "evm_waveform_pct": 10.141396284320823,
+    "evm_symbols_pct": 8.109276665633674
+   },
+   "at 50 through the resampler, frames alone": {
+    "nmse_db": -15.865630439736151,
+    "evm_waveform_pct": 10.235543165214061,
+    "evm_symbols_pct": 8.12654955309847
+   }
+  }
+ }
+}

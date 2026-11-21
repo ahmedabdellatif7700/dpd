@@ -8,7 +8,7 @@ g is warm-started from it.
 
 `ila_step` takes one recording (x_d, y): the form the Pi's data will have (the drive from BASEBAND,
 the PA's output from its lossless tap). `ila` runs passes against a callable `link` (here the test
-PA of dpd/pa.py); with the testbed, each pass is a run.
+PA of dpd/testing/pa.py); with the testbed, each pass is a run.
 """
 import copy
 

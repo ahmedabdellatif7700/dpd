@@ -30,7 +30,7 @@ that points here.
 |---|---|
 | The reference DPD (PyTorch) | [dpd/](dpd/README.md), [METHODOLOGY](dpd/METHODOLOGY.md) (every equation and constant, the page the twin implements), [FORMAT](dpd/FORMAT.md) (the weights and golden files the twin reads) |
 | The C++/CUDA twin | [twin/](twin/README.md) (the C++ model, the kernels, their checks against the reference) |
-| The Jetson, its env and the stage's image | [testbed/jetson/](testbed/jetson/README.md) |
+| The Jetson, its env and the stage's image | [testbed/jetson/](testbed/jetson/README.md), [STAGE.md](testbed/jetson/STAGE.md) (the stage's decisions and tests), [HOOKUP.md](testbed/jetson/HOOKUP.md) (into the Pi's pipeline) |
 | The plan and the record of the steps | [../README.md](../README.md) |
 
 The pipeline the stage plugs into is documented in on-chip-training: `docs/testbed/rpi/PIPELINE.md`
@@ -40,7 +40,7 @@ The pipeline the stage plugs into is documented in on-chip-training: `docs/testb
 
 | Level | Against | Result |
 |---|---|---|
-| test PA (`dpd/pa.py`) | values computed by hand from `rf_amp.m` | equal to 1e-12 (`tests/test_pa.py`) |
+| test PA (`dpd/testing/pa.py`) | values computed by hand from `rf_amp.m` | equal to 1e-12 (`tests/test_pa.py`) |
 | test chain, no DPD | the MATLAB link's PA alone at 1.5 a0 (`pa_operating_point.txt`) | EVM 17.6 % against 17.3 % |
 | [METHODOLOGY](dpd/METHODOLOGY.md) in numpy | the PyTorch model | equal to 1e-5 (`tests/test_methodology.py`) |
 | reference on CUDA | the reference on the CPU, one 6400-sample frame | equal to 1e-4 (`tests/test_models.py`) |
@@ -49,7 +49,13 @@ The pipeline the stage plugs into is documented in on-chip-training: `docs/testb
 | the image | the CPU | a kernel on one 6400-sample frame, error 0 (`gpu_check`) |
 | `CpuModel`, C++ on the CPU (`cpp/`) | the reference's golden files: output and every layer of 8 probes | within 1.9e-6 (`make -C cpp test`, also in the image) |
 | `GpuModel`, the fused CUDA kernel | the golden files, and `CpuModel` | within 1.7e-6, and 7.6e-7 of `CpuModel` (`make -C cpp test`, also in the image) |
-| the twin through the test PA | the reference's NMSE and EVM, both models, validation and test | equal to 9e-7 dB / % (`scripts/twin_check.py`) |
+| the resampler (`dpd/resample.py`) | `scipy.signal.upfirdn`; the waveform made at 8; the round trip | 1e-15; -68.7 dB; -70.8 dB (`tests/test_resample.py`, `checks/resample_check.py`) |
+| the stream (`dpd/stream.py`) | the whole drive's transform | equal to 1e-6 (`tests/test_stream.py`) |
+| `CpuResampler`, `GpuResampler` | the resampler's golden file | within 8.8e-7 (`make -C cpp test`, also in the image) |
+| the stage library (`cpp/arof/`, copied) | the Pi's source; its own test | identical (`diff`, checksums); passes (`make -C cpp test`) |
+| the `dpd` stage, bypass | its input, between a feeder and a sink standing in for the Pi | byte for byte (`tests/test_dpd_stage.py`, on the host and in the image) |
+| the `dpd` stage, dpd mode | the reference offline (model, resampler, stream); κ: co_optics's formula | within 1.2e-6; κ bit for bit |
+| the twin through the test PA | the reference's NMSE and EVM, both models, validation and test | equal to 9e-7 dB / % (`checks/twin_check.py`) |
 | the `dpd` stage | the stage contract, the reference offline | step 3 |
 
 ## Not done yet

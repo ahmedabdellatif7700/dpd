@@ -25,13 +25,14 @@ RUN for dir in \
         fi; \
     done
 
-# Install build dependencies.
+# Install build dependencies (nlohmann/json: the stage library's, as on the Pi).
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         cmake \
         ninja-build \
         build-essential \
-        ccache && \
+        ccache \
+        nlohmann-json3-dev && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
@@ -65,5 +66,5 @@ RUN for dir in \
 COPY --from=build /opt/arof-dpd/ /opt/arof-dpd/
 ENV PATH=/opt/arof-dpd:${PATH}
 
-# Step 3: the dpd stage becomes the command; gpu_check stays as the image's self-test.
-CMD ["gpu_check"]
+# the dpd stage (compose.yaml runs it); gpu_check is the image's self-test
+CMD ["dpd_stage"]

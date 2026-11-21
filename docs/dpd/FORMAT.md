@@ -53,3 +53,11 @@ reference on the CPU, in float32. The frame is the step 1 test drive (seed 2017,
 The probes cover both ends of the frame (windows that reach past it), the first and last samples
 whose window lies inside it (16 and 6384), the next ones, and the middle. When the twin's output
 differs, the first probe that differs shows the stage at fault.
+
+## The resampler's files
+
+`results/models/resampler.dpdt` (2 kB): `resampler.ratio` [2] = 4, 25 (50 → 8; 8 → 50 swaps them)
+and `resampler.h` [503], the low-pass at 80 GS/s (`dpd/resample.py`). Its golden file,
+`results/models/golden/resampler.dpdt`: `input` [6400, 2], a BASEBAND frame at 50 samples per
+symbol; `down` [1024, 2], its 50 → 8; `up` [6400, 2], 8 → 50 of `down`; computed in float64 from the
+float32 input.

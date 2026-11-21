@@ -1,7 +1,7 @@
 """The measures: a gain and a constant are not errors; a known error is measured as such."""
 import numpy as np
 
-from dpd import metrics, signals
+from dpd.testing import metrics, signals
 
 FS = signals.RS * signals.N_DPD
 

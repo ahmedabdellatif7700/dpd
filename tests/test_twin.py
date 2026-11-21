@@ -1,13 +1,13 @@
 """The C++/CUDA twin (cpp/bin/dpd_apply) against the PyTorch reference on a short drive, on the GPU
 and the CPU. Skipped when the C++ tools are not built (e.g. on the PC); the full check through the
-test PA is scripts/twin_check.py."""
+test PA is checks/twin_check.py."""
 import os
 import subprocess
 
 import numpy as np
 import pytest
 
-from dpd.evaluate import drive
+from dpd.testing.evaluate import drive
 from dpd.export import read_tensors, write_tensors
 from dpd.models import DPD, to_iq
 

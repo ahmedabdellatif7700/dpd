@@ -7,20 +7,14 @@
 #include <memory>
 #include <vector>
 
+#include "dpd/device_buffer.h"
 #include "dpd/weights.h"
 
 namespace dpd {
 
 namespace detail {
-struct CudaFree {
-    void operator()(void* p) const noexcept;  // cudaFree
-};
 struct KernelParams;  // the kernel's pointers into the weights (gpu_model.cu)
 }  // namespace detail
-
-// GPU memory, freed when it goes out of scope
-template <typename T>
-using DeviceBuffer = std::unique_ptr<T, detail::CudaFree>;
 
 class GpuModel {
 public:

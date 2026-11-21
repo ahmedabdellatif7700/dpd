@@ -14,6 +14,12 @@ Weights file (`export_weights`): `config` [5] = window, d_model, n_heads, n_laye
 `scale` [1]; then the model's tensors in the order of its state_dict, with its names and shapes
 (docs/dpd/METHODOLOGY.md section 2). Integers in `config` are exact in float32.
 
+Resampler file (`export_resampler`): `resampler.ratio` [2] = up, down for 50 -> 8 (4, 25; the
+other direction swaps them), `resampler.h` [taps], the low-pass at 80 GS/s (dpd/resample.py).
+Its golden file (`export_resampler_golden`): `input` [N, 2] (a BASEBAND-sized frame at 50 samples
+per symbol), `down` [N*4/25, 2] (50 -> 8), `up` [N, 2] (8 -> 50, of `down`), in float64 from the
+float32 input, then stored as float32.
+
 Golden file (`export_golden`): one BASEBAND-sized frame through the reference, float32:
 `input` [N, 2] and `output` [N, 2] (I/Q; the frame alone, zeros beyond its ends, as `predistort`
 does), `probe_index` [P] (the probed output samples), and for each the intermediate values
@@ -91,6 +97,22 @@ def load_weights(path, device=None):
     return DPD(model, device)
 
 
+def export_resampler(path):
+    from . import resample as R
+    write_tensors(path, [("resampler.ratio", [R.UP, R.DOWN]), ("resampler.h", R.lowpass())])
+
+
+def export_resampler_golden(x50, path):
+    """x50: one frame at 50 samples per symbol (complex)"""
+    from . import resample as R
+    x = to_iq(x50).astype(np.float64)
+    xc = x[:, 0] + 1j * x[:, 1]
+    down = R.to_dpd(xc)
+    up = R.to_pipeline(down)[: xc.size]
+    write_tensors(path, [("input", x), ("down", np.stack([down.real, down.imag], 1)),
+                         ("up", np.stack([up.real, up.imag], 1))])
+
+
 @torch.no_grad()
 def export_golden(dpd, x, probes, path):
     """x: one frame (complex); probes: output sample indices whose intermediates are kept.
@@ -109,4 +131,5 @@ def export_golden(dpd, x, probes, path):
     return (o[:, 0] + 1j * o[:, 1]).astype(np.complex64)
 
 
-__all__ = ["write_tensors", "read_tensors", "export_weights", "load_weights", "export_golden", "TransformerDPD"]
+__all__ = ["write_tensors", "read_tensors", "export_weights", "load_weights", "export_golden", "export_resampler",
+           "export_resampler_golden", "TransformerDPD"]

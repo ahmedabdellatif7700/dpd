@@ -1,6 +1,7 @@
 # The reference DPD
 
-`dpd/`, a Python package (PyTorch). It defines the model, trains it, and gives the outputs the
+`dpd/`, a Python package (PyTorch); `dpd/testing/` holds what only the tests and the checks use
+(the test PA, the test signals, the measures). It defines the model, trains it, and gives the outputs the
 C++/CUDA twin must reproduce; on the PC, MATLAB calls it. numpy at the boundary: complex arrays in
 and out, float32 inside, on the CPU or CUDA. Every equation and constant it computes:
 [METHODOLOGY](METHODOLOGY.md).
@@ -9,11 +10,14 @@ and out, float32 inside, on the CPU or CUDA. Every equation and constant it comp
 |---|---|
 | `models.py` | `TransformerDPD`, the network; `DPD`, its numpy wrapper: `predistort(x)`, `predistort_reim(re, im)` (MATLAB's form: two float64 vectors), `fit(u, t)`, `save` / `load`, `describe` |
 | `ila.py` | indirect learning: `target_gain`, `ila_step` (one recording), `ila` (passes against a callable link) |
-| `pa.py` | the test PA: `rf_amp.m` ported line for line, with the nominal link's parameters; `pa_chain` adds and removes the pilot tone. A test fixture, not a link stage |
-| `signals.py` | 16QAM through the RRC filter, and the matched filter |
-| `metrics.py` | NMSE, the EVM of the waveform (in-band), the EVM of the symbols |
+| `testing/pa.py` | the test PA: `rf_amp.m` ported line for line, with the nominal link's parameters; `pa_chain` adds and removes the pilot tone. A test fixture, not a link stage |
+| `testing/signals.py` | 16QAM through the RRC filter, and the matched filter |
+| `testing/metrics.py` | NMSE, the EVM of the waveform (in-band), the EVM of the symbols |
 | `export.py` | the weights and the golden files for the C++/CUDA twin ([FORMAT](FORMAT.md)) |
-| `evaluate.py` | the test drive and the measures at the PA's output, shared by the checks of the reference and of the twin |
+| `resample.py` | the resampler between the pipeline's 50 samples per symbol and the model's 8 (one Kaiser low-pass at 80 GS/s, 503 taps, 80 dB) |
+| `stream.py` | `FrameStream`: the stage's frame-by-frame processing with a 250-sample holdback (decision 3b), the specification of the C++ stage |
+| `frame2.py` | frame version 2 in Python (the stage's feeder and sink, the PA tap's recordings): on-chip-training's `frame2.h` layout and `tap_frames()` |
+| `testing/evaluate.py` | the test drive and the measures at the PA's output, shared by the checks of the reference and of the twin |
 
 ## The model
 
@@ -67,7 +71,7 @@ operating point.
 
 ## Results
 
-Step 1, `scripts/step1_check.py` on the GPU: 16QAM at 8 samples per symbol, 4096 training symbols
+Step 1, `checks/step1_check.py` on the GPU: 16QAM at 8 samples per symbol, 4096 training symbols
 (seed 1), 2048 validation (seed 4242) and test (seed 2017) symbols; 3 ILA passes of 30 epochs,
 ~170 s. Test sequence (`results/step1.txt`; validation agrees to 0.1):
 
@@ -78,7 +82,7 @@ Step 1, `scripts/step1_check.py` on the GPU: 16QAM at 8 samples per symbol, 4096
 
 ## Tests
 
-`python -m pytest -q`, 27 tests, ~100 s:
+`python -m pytest -q`, 40 tests, ~140 s:
 
 | File | Checks |
 |---|---|
@@ -88,4 +92,7 @@ Step 1, `scripts/step1_check.py` on the GPU: 16QAM at 8 samples per symbol, 4096
 | `test_methodology.py` | [METHODOLOGY](METHODOLOGY.md), written again in numpy, against the model (1e-5) |
 | `test_export.py` | the file format byte for byte; the weights' round trip (bit-exact); the trace is the forward; the golden probes |
 | `test_ila.py` | a short ILA run improves NMSE by 6 dB and the EVM by 40 % |
+| `test_resample.py` | the filter, the lengths, the formula against `scipy.signal.upfirdn`, the alignment with the waveform made at 8, the round trip |
+| `test_stream.py` | the stream equal to the whole drive's transform, the flush of a calibration group, the grid |
+| `test_dpd_stage.py` | the `dpd` stage between a feeder and a sink standing in for the Pi: bypass byte for byte, dpd against the reference offline on CUDA and the CPU, κ, a wrong pipeline (skipped if not built; `DPD_STAGE_DOCKER=1`: in the image) |
 | `test_twin.py` | the C++/CUDA twin (`cpp/bin/dpd_apply`) against the reference on a short drive, GPU and CPU (skipped if not built) |
