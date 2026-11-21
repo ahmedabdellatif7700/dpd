@@ -26,7 +26,13 @@ Both machines on the testbed's wired subnet 192.168.91.0/25; the KV260 is not in
 Checked here: the override merges as intended (`docker compose config` on copies of the files: no
 `dpd_bb`, `source` and `pa`'s tap to 192.168.91.89, `co_optics` published on 7002); the patch applies
 to on-chip-training `14a72ff` (`git apply --check`); the Jetson has no firewall (ufw inactive,
-iptables accepting). Not checked: anything on the Pi (its firewall, docker's port publishing there).
+iptables accepting).
+
+Read on the Pi over SSH (2026-11-21, `ssh rpi4b`, read-only): no firewall (nftables, iptables, ufw
+inactive); nothing running; the image `arof-stream:latest`; `~/on-chip-training` on branch
+`paper-rewrite` at `b6f4e49`, an ancestor of `14a72ff` with `testbed/rpi` identical: the stage
+library copied here is the code the Pi runs, and the patch and the override apply to its clone as
+they are. SSH works both ways (`ssh rpi4b` from the Jetson, `ssh orinnano8s` from the Pi).
 
 ## The settings
 
@@ -42,35 +48,9 @@ CONFIG frame (on-chip-training `source_runner.cpp`). For the runs below, in a co
 
 ## The clocks
 
-`capture_time_ns`, `t_recv_ns` and `t_send_ns` are compared across the two machines only as well as
-their clocks agree. Today the Jetson follows the public pool with `systemd-timesyncd` (stratum 3,
-19 ms root distance, polling every 34 min): far too coarse for latencies of a few milliseconds per
-stage. Its network interface has no hardware time stamps (`ethtool -T`: software only), so PTP would
-run in software, with no gain over NTP on this LAN.
-
-**Proposed: chrony, the Pi serving time to the Jetson** over the wired LAN (typically tens of
-microseconds of offset). System changes on both machines, for the user to make:
-
-```bash
-# Pi (Arch Linux ARM)
-sudo pacman -S chrony
-#   /etc/chrony.conf: keep its pool or server lines, add
-#     allow 192.168.91.0/25
-#     local stratum 10          # keeps serving the LAN if the internet is gone
-sudo systemctl disable --now systemd-timesyncd 2>/dev/null; sudo systemctl enable --now chronyd
-
-# Jetson (Ubuntu 24.04): installing chrony replaces systemd-timesyncd
-sudo apt install chrony
-#   /etc/chrony/chrony.conf: comment out the pool lines, add
-#     server 192.168.91.80 iburst prefer minpoll 2 maxpoll 4
-#     makestep 0.1 3
-sudo systemctl restart chrony
-chronyc tracking            # "System time" offset: should settle within ~0.1 ms
-chronyc sources -v          # 192.168.91.80 marked '*'
-```
-
-The logs then carry the clocks' agreement with them: record `chronyc tracking` on the Jetson at the
-start and the end of every run whose latencies are analysed.
+Set up on 2026-11-21: chrony on both, the Pi serving the subnet, the Jetson following the Pi only;
+offset between the two ~2 µs (standard deviation). What was changed on each machine, the checks,
+how to undo it, and the KV260 for later: [CLOCKS.md](CLOCKS.md).
 
 ## Bring-up, in order
 

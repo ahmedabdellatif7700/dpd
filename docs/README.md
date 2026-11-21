@@ -30,7 +30,7 @@ that points here.
 |---|---|
 | The reference DPD (PyTorch) | [dpd/](dpd/README.md), [METHODOLOGY](dpd/METHODOLOGY.md) (every equation and constant, the page the twin implements), [FORMAT](dpd/FORMAT.md) (the weights and golden files the twin reads) |
 | The C++/CUDA twin | [twin/](twin/README.md) (the C++ model, the kernels, their checks against the reference) |
-| The Jetson, its env and the stage's image | [testbed/jetson/](testbed/jetson/README.md), [STAGE.md](testbed/jetson/STAGE.md) (the stage's decisions and tests), [HOOKUP.md](testbed/jetson/HOOKUP.md) (into the Pi's pipeline) |
+| The Jetson, its env and the stage's image | [testbed/jetson/](testbed/jetson/README.md), [STAGE.md](testbed/jetson/STAGE.md) (the stage's decisions and tests), [HOOKUP.md](testbed/jetson/HOOKUP.md) (into the Pi's pipeline), [CLOCKS.md](testbed/jetson/CLOCKS.md) (chrony on the Pi and the Jetson) |
 | The plan and the record of the steps | [../README.md](../README.md) |
 
 The pipeline the stage plugs into is documented in on-chip-training: `docs/testbed/rpi/PIPELINE.md`
